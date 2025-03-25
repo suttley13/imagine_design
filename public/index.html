@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imagine Design</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Liter&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="imagine-text">Imagine</span><span class="design-text">Design</span></h1>
+            <button id="save-button" type="button" class="save-button" disabled>Save Results</button>
+        </div>
+
+        <div id="redesign-mode">
+            <div class="redesign-layout">
+                <!-- Left side with inputs -->
+                <div class="image-upload-container">
+                    <!-- Original room upload -->
+                    <div class="upload-section">
+                        <h3>Your Room</h3>
+                        <div class="upload-container" id="original-upload-area">
+                            <label for="original-image-upload" class="upload-label">
+                                <img src="noun-upload-photo-1337310 (2).svg" alt="Upload" class="upload-svg">
+                            </label>
+                            <input type="file" id="original-image-upload" accept="image/*" hidden>
+                        </div>
+                        <div id="original-preview-container" class="hidden">
+                            <img id="original-preview" src="" alt="Preview">
+                            <button type="button" id="original-remove-image">✕</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Inspiration room upload -->
+                    <div class="upload-section">
+                        <h3>Inspiration Room</h3>
+                        <div class="upload-container" id="inspiration-upload-area">
+                            <label for="inspiration-image-upload" class="upload-label">
+                                <img src="noun-upload-photo-1337310 (2).svg" alt="Upload" class="upload-svg">
+                            </label>
+                            <input type="file" id="inspiration-image-upload" accept="image/*" hidden>
+                        </div>
+                        <div id="inspiration-preview-container" class="hidden">
+                            <img id="inspiration-preview" src="" alt="Preview">
+                            <button type="button" id="inspiration-remove-image">✕</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Redesign button -->
+                    <button id="redesign-button" type="button" class="imagine-button" disabled><span class="imagine-text">Imagine</span><span class="design-text">Design</span></button>
+                </div>
+                
+                <!-- Middle section with suggestions -->
+                <div class="middle-container">
+                    <div class="suggestions-container">
+                        <h3>Redesign Suggestions</h3>
+                        <div id="suggestions-placeholder" class="placeholder-icon">
+                            <img src="noun-list-4896110.svg" alt="Suggestions List" class="list-svg">
+                        </div>
+                        <div id="suggestions-list" class="hidden">
+                            <div class="suggestion-item">
+                                <div class="suggestion-status">1</div>
+                                <div class="suggestion-text"></div>
+                            </div>
+                            <div class="suggestion-item">
+                                <div class="suggestion-status">2</div>
+                                <div class="suggestion-text"></div>
+                            </div>
+                            <div class="suggestion-item">
+                                <div class="suggestion-status">3</div>
+                                <div class="suggestion-text"></div>
+                            </div>
+                        </div>
+                        <div id="suggestions-loading" class="hidden">
+                            <div class="spinner"></div>
+                            <p>Generating suggestions...</p>
+                        </div>
+                        <div id="suggestions-click-hint" class="click-hint suggestions-hint hidden">Click on the suggestion numbers to view different redesigns</div>
+                    </div>
+                </div>
+                
+                <!-- Right side with result image -->
+                <div class="result-container">
+                    <div class="image-box result-image">
+                        <h3>Generated Redesign</h3>
+                        <div id="result-placeholder" class="placeholder-icon">
+                            <img src="noun-ai-image-7295073.svg" alt="AI Image" class="ai-image-svg">
+                        </div>
+                        <div id="result-container" class="hidden">
+                            <img id="result-image" src="" alt="Generated redesign">
+                        </div>
+                        <div id="result-loading-spinner" class="hidden">
+                            <div class="spinner"></div>
+                            <p>Processing suggestion <span id="current-suggestion-number">1</span>/3...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="click-hint hidden">Click on the suggestion numbers to view different redesigns</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html> 

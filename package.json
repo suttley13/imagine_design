@@ -1,0 +1,12 @@
+{
+  "name": "gemini-chat-app",
+  "version": "1.0.0",
+  "description": "Gemini AI Chat application with Python Flask backend",
+  "private": true,
+  "scripts": {
+    "start": "python app.py"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

@@ -379,6 +379,7 @@ def make_claude_request(url, headers, payload, max_retries=3, initial_delay=1):
 def claude_suggestions():
     try:
         print("Received request for Claude suggestions")
+        print(f"USING CLAUDE MODEL: {CLAUDE_MODEL}")
         
         # Check if we have two images
         if 'original' not in request.files or 'inspiration' not in request.files:
@@ -494,6 +495,8 @@ Return ONLY the JSON array with exactly 3 suggestions, with no additional text b
             "content-type": "application/json"
         }
         
+        print(f"Preparing request with Claude model: {CLAUDE_MODEL}")
+        
         payload = {
             "model": CLAUDE_MODEL,
             "max_tokens": 1000,
@@ -597,103 +600,16 @@ Return ONLY the JSON array with exactly 3 suggestions, with no additional text b
 def save_results():
     try:
         data = request.json
-        use_original_upload = data.get('use_original_upload', False)
         result_image_url = data.get('result_image')
         suggestions = data.get('suggestions', [])
-        
-        # Find the original uploaded file by looking for the prefix
-        original_file = None
-        if use_original_upload:
-            # Get all jpg files in the uploads directory
-            upload_files = [os.path.join('uploads', f) for f in os.listdir('uploads') if f.endswith('.jpg')]
-            if upload_files:
-                # First try to find files with the "original_" prefix
-                original_prefixed_files = [f for f in upload_files if os.path.basename(f).startswith('original_')]
-                
-                if original_prefixed_files:
-                    # Sort by modification time (most recent first)
-                    original_prefixed_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-                    original_file = original_prefixed_files[0]
-                    print(f"Found original image with prefix: {original_file}")
-                else:
-                    # Fallback to the old method if no prefixed files found
-                    # Sort files by modification time (most recent first)
-                    upload_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-                    
-                    # The first file should be the most recent original upload
-                    # Try to exclude files that might be inspiration images
-                    for file in upload_files:
-                        if "inspiration_" not in os.path.basename(file) and "processed" not in file:
-                            original_file = file
-                            break
-                    
-                    # If we still don't have an original file, just use the most recent
-                    if not original_file and upload_files:
-                        original_file = upload_files[0]
-                
-                print(f"Using original uploaded file: {original_file}")
         
         # Remove the leading path as we'll be reading from the filesystem
         result_file = result_image_url.replace('/generated/', 'generated/')
         
-        # Get the downloads folder path
-        if sys.platform == 'darwin':  # macOS
-            downloads_folder = os.path.expanduser('~/Downloads')
-        elif sys.platform == 'win32':  # Windows
-            import winreg
-            sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
-            downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
-                downloads_folder = winreg.QueryValueEx(key, downloads_guid)[0]
-        else:  # Linux
-            downloads_folder = os.path.expanduser('~/Downloads')
-        
-        # Generate timestamped filenames
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        original_save_path = os.path.join(downloads_folder, f"room_original_{timestamp}.jpg")
-        result_save_path = os.path.join(downloads_folder, f"room_redesign_{timestamp}.jpg")
-        
-        # Function to convert and save image as JPEG
-        def convert_to_jpeg(source_path, destination_path):
-            try:
-                # Open the image (handles various formats)
-                img = Image.open(source_path)
-                
-                # Convert to RGB if needed (required for JPEG)
-                if img.mode in ('RGBA', 'LA'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    background.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else img.split()[1])
-                    img = background
-                elif img.mode != 'RGB':
-                    img = img.convert('RGB')
-                
-                # Save as JPEG with high quality
-                img.save(destination_path, format='JPEG', quality=95)
-                return True
-            except Exception as e:
-                print(f"Error converting image to JPEG: {str(e)}")
-                return False
-        
-        # Convert and save the original image as JPEG
-        if original_file and os.path.exists(original_file):
-            convert_success = convert_to_jpeg(original_file, original_save_path)
-            if convert_success:
-                print(f"Saved original image as JPEG to {original_save_path}")
-            else:
-                print(f"Failed to convert original image to JPEG")
-        else:
-            print(f"Original file not found: {original_file}")
-        
-        # Convert and save the result image as JPEG
-        if os.path.exists(result_file):
-            convert_success = convert_to_jpeg(result_file, result_save_path)
-            if convert_success:
-                print(f"Saved result image as JPEG to {result_save_path}")
-            else:
-                print(f"Failed to convert result image to JPEG")
-        else:
+        # Check if the result file exists
+        if not os.path.exists(result_file):
             print(f"Result file not found: {result_file}")
+            return jsonify({"error": "Result image not found"}), 404
         
         # Format suggestions for clipboard
         suggestion_text = ""
@@ -701,16 +617,87 @@ def save_results():
             suggestion_text += f"{i+1}. {suggestion.get('title')}\n"
             suggestion_text += f"{suggestion.get('description')}\n\n"
         
-        # Return success with clipboard content
+        # Instead of saving to downloads folder, create a download URL
+        # Generate a unique filename
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"room_redesign_{timestamp}.jpg"
+        
+        # Store the original path and generate a download URL
+        # We'll use a temporary mapping to handle the download
+        app.config.setdefault('DOWNLOAD_MAPPING', {})
+        download_id = str(uuid.uuid4())
+        app.config['DOWNLOAD_MAPPING'][download_id] = {
+            'file_path': result_file,
+            'filename': download_filename,
+            'timestamp': datetime.datetime.now()
+        }
+        
+        # Create download URL
+        download_url = f"/api/download/{download_id}"
+        
+        # Return success with download URL and clipboard content
         return jsonify({
             "success": True,
-            "message": "Images saved to Downloads folder as JPEGs",
-            "clipboard_content": suggestion_text
+            "message": "Image ready for download",
+            "clipboard_content": suggestion_text,
+            "download_url": download_url
         })
     
     except Exception as e:
-        print(f"Error saving results: {str(e)}")
+        print(f"Error preparing download: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/download/<download_id>', methods=['GET'])
+def download_file(download_id):
+    try:
+        # Get the file information from our mapping
+        download_mapping = app.config.get('DOWNLOAD_MAPPING', {})
+        if download_id not in download_mapping:
+            return "Download expired or not found", 404
+        
+        file_info = download_mapping[download_id]
+        file_path = file_info['file_path']
+        filename = file_info['filename']
+        
+        # Check if the file exists
+        if not os.path.exists(file_path):
+            return "File not found", 404
+            
+        # Create a high-quality JPEG version of the image
+        try:
+            img = Image.open(file_path)
+            
+            # Convert to RGB if needed (required for JPEG)
+            if img.mode in ('RGBA', 'LA'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else img.split()[1])
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+                
+            # Create a BytesIO object to hold the image data
+            img_io = io.BytesIO()
+            img.save(img_io, format='JPEG', quality=95)
+            img_io.seek(0)
+            
+            # Remove the download mapping after use (cleanup)
+            download_mapping.pop(download_id, None)
+            
+            # Return the image as a downloadable attachment
+            return send_file(
+                img_io,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='image/jpeg'
+            )
+        except Exception as e:
+            print(f"Error processing image for download: {str(e)}")
+            return str(e), 500
+            
+    except Exception as e:
+        print(f"Error in download: {str(e)}")
+        return str(e), 500
 
 # Serve static files from public directory
 @app.route('/<path:path>')
@@ -733,5 +720,5 @@ def serve_generated_image(filename):
         return "Image not found", 404
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 3033))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=True) 

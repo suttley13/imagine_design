@@ -41,16 +41,17 @@ body {
     font-family: 'Poppins', sans-serif;
     line-height: 1.6;
     color: #333;
-    background-color: #f8f9fa;
-    height: 100vh;
-    overflow: hidden;
+    background-color: purple;
+    min-height: 100vh;
+    overflow-y: auto;
 }
 
 .container {
     max-width: 100%;
-    height: calc(100vh - 80px);
+    min-height: calc(100vh - 80px);
     margin: 0 auto;
     padding: 0 20px 20px 20px;
+    overflow-y: auto;
 }
 
 .header {
@@ -79,19 +80,26 @@ h1 {
     display: inline-block;
 }
 
-.imagine-text {
+.redesign-text {
     letter-spacing: 0.05em;
     font-size: 2rem;
     display: inline-block;
 }
 
-.design-text {
+.ai-text {
     display: inline-block;
     letter-spacing: 0.05em;
     font-size: 1.2rem;
     position: relative;
     top: 0.4em;
     margin-left: 0.1em;
+    margin-right: 0.1em;
+}
+
+.pro-text {
+    letter-spacing: 0.05em;
+    font-size: 2rem;
+    display: inline-block;
 }
 
 h2, h3 {
@@ -570,7 +578,7 @@ textarea {
 }
 
 /* Media queries for responsive design */
-@media (max-width: 1200px) {
+@media (max-width: 1000px) {
     .redesign-layout {
         flex-direction: column;
     }
@@ -625,6 +633,23 @@ textarea {
 }
 
 @media (max-width: 768px) {
+    /* Enable scrolling on mobile */
+    body {
+        height: auto;
+        overflow-y: auto;
+    }
+    
+    .container {
+        height: auto;
+        overflow-y: auto;
+    }
+    
+    /* Hide save button on mobile */
+    .save-button {
+        display: none;
+    }
+    
+    /* Adjust upload sections to be smaller */
     .image-upload-container {
         flex-direction: column;
     }
@@ -632,6 +657,29 @@ textarea {
     .upload-section {
         width: 100%;
         min-width: 0;
+        height: 200px;  /* Reduced from 280px */
+        min-height: 200px;
+        max-height: 200px;
+    }
+    
+    .upload-label {
+        padding: 40px 0;  /* Reduced padding */
+    }
+    
+    /* Adjust spacing to fit more content in viewport */
+    .header {
+        margin-bottom: 10px;
+        padding: 5px 0;
+    }
+    
+    .image-upload-container {
+        gap: 10px;
+    }
+    
+    /* Make upload image icons smaller */
+    .upload-svg {
+        width: 50px;
+        height: 50px;
     }
 }
 
@@ -728,14 +776,15 @@ textarea {
 
 /* Save button */
 .save-button {
-    background-color: #4361ee;
+    background-color: #000000;
     color: white;
     font-weight: bold;
     transition: background-color 0.3s;
+    border-radius: 8px;
 }
 
 .save-button:hover {
-    background-color: #3a56d4;
+    background-color: #333333;
 }
 
 .save-button:disabled {
@@ -759,19 +808,26 @@ textarea {
     min-width: 150px;
 }
 
-.imagine-button .imagine-text {
+.imagine-button .redesign-text {
     letter-spacing: 0.25em;
     font-size: 14px;
     display: inline-block;
 }
 
-.imagine-button .design-text {
+.imagine-button .ai-text {
     display: inline-block;
     letter-spacing: 0.15em;
     font-size: 9px;
     position: relative;
     top: 0.4em;
     margin-left: 0.1em;
+    margin-right: 0.1em;
+}
+
+.imagine-button .pro-text {
+    letter-spacing: 0.25em;
+    font-size: 14px;
+    display: inline-block;
 }
 
 .imagine-button:hover {

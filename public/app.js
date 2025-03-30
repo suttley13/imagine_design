@@ -703,6 +703,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Handle redesign button click
     redesignButton.addEventListener('click', () => {
+        // Track custom event in Google Analytics
+        if (typeof gtag === 'function') {
+            gtag('event', 'Clicked_Redesign_Button', {
+                'event_name': 'lksdfjfdjk'
+            });
+            console.log('Tracked: Clicked_Redesign_Button event');
+        }
+        
         runRedesignProcess();
     });
 
@@ -800,29 +808,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 finalResultImageUrl = resultImage.src;
             }
             
-            // For the original image, get the image from the file upload, not the generated history
-            // Find the original uploaded file path from server logs or storage
-            // We'll send the original file path and the server will handle finding it
-            
             // Extract the relative paths for the server
             const resultPath = new URL(finalResultImageUrl, window.location.href).pathname;
             
-            // Instead of trying to compute the original image path here, send the file info
-            // The server will handle finding the original file
+            // Send the request to prepare the download
             const response = await fetch('/api/save-results', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    use_original_upload: true, // Tell server to use the original uploaded file
                     result_image: resultPath,
                     suggestions: suggestions
                 })
             });
             
             if (!response.ok) {
-                throw new Error('Failed to save results');
+                throw new Error('Failed to prepare download');
             }
             
             const data = await response.json();
@@ -830,8 +832,29 @@ document.addEventListener('DOMContentLoaded', () => {
             // Copy the content to clipboard
             await navigator.clipboard.writeText(data.clipboard_content);
             
-            // Show success message
-            showAlert('Images saved to Downloads folder and descriptions copied to clipboard', false);
+            // Trigger the download by creating a link and clicking it
+            if (data.download_url) {
+                // Create a hidden anchor element for the download
+                const downloadLink = document.createElement('a');
+                downloadLink.href = data.download_url;
+                downloadLink.download = 'redesign_result.jpg'; // Add a default filename
+                downloadLink.setAttribute('download', ''); // Ensure it's a download
+                downloadLink.style.display = 'none';
+                document.body.appendChild(downloadLink);
+                
+                // Trigger the download
+                downloadLink.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(downloadLink);
+                }, 100);
+                
+                // Show success message
+                showAlert('Final redesign image downloading and descriptions copied to clipboard', false);
+            } else {
+                throw new Error('No download URL provided');
+            }
             
         } catch (error) {
             console.error('Error saving results:', error);

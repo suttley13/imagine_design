@@ -684,13 +684,15 @@ def download_file(download_id):
             # Remove the download mapping after use (cleanup)
             download_mapping.pop(download_id, None)
             
-            # Return the image as a downloadable attachment
-            return send_file(
+            # Set headers to force download
+            response = send_file(
                 img_io,
                 as_attachment=True,
                 download_name=filename,
                 mimetype='image/jpeg'
             )
+            response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+            return response
         except Exception as e:
             print(f"Error processing image for download: {str(e)}")
             return str(e), 500

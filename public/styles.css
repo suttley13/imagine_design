@@ -944,4 +944,103 @@ textarea {
 #redesign-loading p {
     font-size: 16px;
     color: #555;
+}
+
+/* Mobile Styles */
+@media (max-width: 767px) {
+    /* Hide save design button on mobile */
+    .save-button {
+        display: none;
+    }
+    
+    /* Stack upload sections vertically */
+    .upload-section-container {
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+    }
+    
+    /* Main upload container for mobile */
+    .upload-container {
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+        height: calc(100vh - 180px);
+        justify-content: space-between;
+    }
+    
+    /* Full width image boxes for mobile */
+    .image-box {
+        width: 100%;
+        margin: 0;
+        max-height: 35vh;
+    }
+
+    /* Display title centered on mobile */
+    .image-box-title {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    /* Full width redesign button for mobile */
+    .redesign-button {
+        width: 100%;
+        margin-top: 10px;
+    }
+    
+    /* Adjust header spacing for mobile */
+    .header {
+        padding: 15px 15px;
+    }
+    
+    /* Mobile back button styling */
+    .back-button-container {
+        position: fixed;
+        left: 10px;
+        top: 15px;
+    }
+    
+    .back-button {
+        width: auto !important;
+        min-width: auto !important;
+        padding: 5px 10px;
+        font-size: 0;  /* Hide any text content */
+    }
+    
+    .back-button::after {
+        content: none;  /* Ensure nothing is added after */
+    }
+    
+    .back-button::before {
+        content: "←";
+        font-size: 16px;  /* Reset font size for the arrow */
+    }
+    
+    /* Make suggestions more compact */
+    .suggestions-container {
+        padding: 10px;
+        height: auto;
+        max-height: calc(40vh);
+    }
+    
+    .suggestion-item {
+        margin-bottom: 5px;
+        padding-bottom: 5px;
+    }
+    
+    /* Hide the suggestion hint text */
+    .suggestions-hint {
+        display: none;
+    }
+    
+    /* Make results div full width */
+    .results-content {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .middle-container, 
+    .result-container {
+        width: 100%;
+    }
 } 

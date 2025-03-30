@@ -956,7 +956,7 @@ textarea {
     /* Stack upload sections vertically */
     .upload-section-container {
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
         width: 100%;
         margin-bottom: 0;
     }
@@ -964,9 +964,9 @@ textarea {
     /* Main upload container for mobile */
     .upload-container {
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
         width: 100%;
-        height: calc(100vh - 200px);
+        height: calc(100vh - 220px);
         justify-content: space-between;
     }
     
@@ -974,12 +974,12 @@ textarea {
     .image-box {
         width: 100%;
         margin: 0;
-        max-height: 30vh;
-        height: 30vh;
+        max-height: 25vh;
+        height: 25vh;
     }
     
     .image-box-dropzone {
-        min-height: 20vh;
+        min-height: 15vh;
     }
 
     /* Display title centered on mobile */
@@ -993,7 +993,7 @@ textarea {
         width: 100%;
         margin-top: 5px;
         position: relative;
-        bottom: 10px;
+        bottom: 15px;
     }
     
     /* Adjust header spacing for mobile */

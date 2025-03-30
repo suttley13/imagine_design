@@ -36,8 +36,8 @@
 
         <div id="redesign-mode">
             <div class="redesign-layout">
-                <!-- Left side with inputs -->
-                <div class="image-upload-container">
+                <!-- Initial View: Left and Right for image uploads -->
+                <div class="upload-section-container">
                     <!-- Original room upload -->
                     <div class="upload-section">
                         <h3>Your Room</h3>
@@ -67,57 +67,79 @@
                             <button type="button" id="inspiration-remove-image">✕</button>
                         </div>
                     </div>
-                    
-                    <!-- Redesign button -->
+                </div>
+
+                <!-- Redesign button row -->
+                <div class="redesign-button-container">
                     <button id="redesign-button" type="button" class="imagine-button" disabled><span class="redesign-text">REDESIGN</span></button>
-                </div>
-                
-                <!-- Middle section with suggestions -->
-                <div class="middle-container">
-                    <div class="suggestions-container">
-                        <h3>Redesign Suggestions</h3>
-                        <div id="suggestions-placeholder" class="placeholder-icon">
-                            <img src="noun-list-4896110.svg" alt="Suggestions List" class="list-svg">
-                        </div>
-                        <div id="suggestions-list" class="hidden">
-                            <div class="suggestion-item">
-                                <div class="suggestion-status">1</div>
-                                <div class="suggestion-text"></div>
-                            </div>
-                            <div class="suggestion-item">
-                                <div class="suggestion-status">2</div>
-                                <div class="suggestion-text"></div>
-                            </div>
-                            <div class="suggestion-item">
-                                <div class="suggestion-status">3</div>
-                                <div class="suggestion-text"></div>
-                            </div>
-                        </div>
-                        <div id="suggestions-loading" class="hidden">
-                            <div class="spinner"></div>
-                            <p>Generating suggestions...</p>
-                        </div>
-                        <div id="suggestions-click-hint" class="click-hint suggestions-hint hidden">Click on the suggestion numbers to view different redesigns</div>
+                    <!-- Loading spinner (hidden initially) -->
+                    <div id="redesign-loading" class="hidden">
+                        <div class="spinner"></div>
+                        <p>Generating your redesigns...</p>
                     </div>
                 </div>
                 
-                <!-- Right side with result image -->
-                <div class="result-container">
-                    <div class="image-box result-image">
-                        <h3>Generated Redesign</h3>
-                        <div id="result-placeholder" class="placeholder-icon">
-                            <img src="noun-ai-image-7295073.svg" alt="AI Image" class="ai-image-svg">
-                        </div>
-                        <div id="result-container" class="hidden">
-                            <img id="result-image" src="" alt="Generated redesign">
-                        </div>
-                        <div id="result-loading-spinner" class="hidden">
-                            <div class="spinner"></div>
-                            <p>Processing suggestion <span id="current-suggestion-number">1</span>/3...</p>
-                        </div>
+                <!-- Results View (Hidden Initially) -->
+                <div id="results-container" class="hidden">
+                    <!-- Back button -->
+                    <div class="back-button-container">
+                        <button id="back-button" type="button" class="back-button">← Back</button>
                     </div>
                     
-                    <div class="click-hint hidden">Click on the suggestion numbers to view different redesigns</div>
+                    <!-- Results content wrapper -->
+                    <div class="results-content">
+                        <!-- Suggestions section -->
+                        <div class="middle-container">
+                            <div class="suggestions-container">
+                                <h3>Redesign Suggestions</h3>
+                                <div id="suggestions-placeholder" class="placeholder-icon">
+                                    <img src="noun-list-4896110.svg" alt="Suggestions List" class="list-svg">
+                                </div>
+                                <div id="suggestions-list" class="hidden">
+                                    <div class="suggestion-item">
+                                        <div class="suggestion-status">1</div>
+                                        <div class="suggestion-text"></div>
+                                    </div>
+                                    <div class="suggestion-item">
+                                        <div class="suggestion-status">2</div>
+                                        <div class="suggestion-text"></div>
+                                    </div>
+                                    <div class="suggestion-item">
+                                        <div class="suggestion-status">3</div>
+                                        <div class="suggestion-text"></div>
+                                    </div>
+                                </div>
+                                <div id="suggestions-loading" class="hidden">
+                                    <div class="spinner"></div>
+                                    <p>Generating suggestions...</p>
+                                </div>
+                                <div id="suggestions-click-hint" class="click-hint suggestions-hint hidden">Click on the suggestion numbers to view different redesigns</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Right side with result image -->
+                        <div class="result-container">
+                            <div class="image-box result-image">
+                                <h3>Generated Redesign</h3>
+                                <div id="result-placeholder" class="placeholder-icon">
+                                    <img src="noun-ai-image-7295073.svg" alt="AI Image" class="ai-image-svg">
+                                </div>
+                                <div id="result-container" class="hidden">
+                                    <img id="result-image" src="" alt="Generated redesign">
+                                    <!-- Corner loading spinner -->
+                                    <div id="corner-loading-spinner" class="corner-loading-container hidden">
+                                        <div class="spinner corner-spinner"></div>
+                                    </div>
+                                </div>
+                                <div id="result-loading-spinner" class="hidden">
+                                    <div class="spinner"></div>
+                                    <p>Processing suggestion <span id="current-suggestion-number">1</span>/3...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="click-hint hidden">Click on the suggestion numbers to view different redesigns</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

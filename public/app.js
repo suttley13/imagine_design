@@ -30,6 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentSuggestionNumber = document.getElementById('current-suggestion-number');
     const clickHint = document.querySelector('.click-hint');
     
+    const resultsContainer = document.getElementById('results-container');
+    const redesignLoading = document.getElementById('redesign-loading');
+    const uploadSectionContainer = document.querySelector('.upload-section-container');
+    const redesignButtonContainer = document.querySelector('.redesign-button-container');
+    const backButton = document.getElementById('back-button');
+    
+    const cornerLoadingSpinner = document.getElementById('corner-loading-spinner');
+    
     let originalSelectedImage = null;
     let inspirationSelectedImage = null;
     let currentSuggestionIndex = 0;
@@ -388,6 +396,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Reset processing state
     function resetProcessing() {
+        isProcessing = false;
+        redesignButton.disabled = false;
+        redesignButton.classList.remove('hidden');
+        redesignLoading.classList.add('hidden');
+        
+        // Hide loading states
+        suggestionsLoading.classList.add('hidden');
+        resultLoadingSpinner.classList.add('hidden');
+        cornerLoadingSpinner.classList.add('hidden');
+        
         // Reset suggestion statuses
         suggestionStatuses.forEach(status => {
             status.classList.remove('completed');
@@ -415,7 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
         suggestionsPlaceholder.classList.remove('hidden');
         
         redesignButton.disabled = false;
-        isProcessing = false;
+        
+        // Show upload sections and hide results
+        uploadSectionContainer.classList.remove('hidden');
+        redesignButtonContainer.classList.remove('hidden');
+        resultsContainer.classList.add('hidden');
         
         // Enable save button if we have results
         updateSaveButtonState();
@@ -428,6 +450,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Update UI
             currentSuggestionNumber.textContent = suggestionIndex + 1;
+            
+            // Mark all previous steps as completed
+            for (let i = 0; i < suggestionIndex; i++) {
+                suggestionStatuses[i].classList.remove('active');
+                suggestionStatuses[i].classList.add('completed');
+            }
+            
+            // Show this step as active
             suggestionStatuses[suggestionIndex].classList.add('active');
             
             // Create FormData for image upload
@@ -493,10 +523,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultImage.src = imageUrl;
                 resultPlaceholder.classList.add('hidden');
                 resultContainer.classList.remove('hidden');
+                resultLoadingSpinner.classList.add('hidden');
+                cornerLoadingSpinner.classList.add('hidden');
+                
+                // Show this image to the user
+                // Add a visual indicator for the current step
+                suggestionStatuses.forEach((status, idx) => {
+                    status.classList.remove('selected');
+                    if (idx === suggestionIndex) {
+                        status.classList.add('selected');
+                    }
+                });
                 
                 // Mark this suggestion as completed
                 suggestionStatuses[suggestionIndex].classList.remove('active');
                 suggestionStatuses[suggestionIndex].classList.add('completed');
+                
+                // Wait a moment for the user to see this generation if it's not the last one
+                if (suggestionIndex < 2) {
+                    // If it's not the last image, wait a bit before moving to the next step
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    // Show the corner loading spinner instead of the full-screen one
+                    cornerLoadingSpinner.classList.remove('hidden');
+                }
                 
                 // Add click event listener to the suggestion status
                 suggestionStatuses[suggestionIndex].addEventListener('click', () => {
@@ -509,6 +558,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Display this image
                     resultImage.src = imageUrl;
                     resultContainer.classList.remove('hidden');
+                    resultLoadingSpinner.classList.add('hidden');
+                    cornerLoadingSpinner.classList.add('hidden');
                     
                     // Setup before/after comparison for this result
                     setupBeforeAfterComparison();
@@ -551,20 +602,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log('Starting redesign process');
         
-        // Clear previous results
-        resultContainer.classList.add('hidden');
-        
-        // Keep suggestions container visible but show loading state
-        suggestionsPlaceholder.classList.add('hidden');
-        suggestionsList.classList.add('hidden');
-        suggestionsLoading.classList.remove('hidden');
-        suggestionsContainer.classList.remove('hidden');
-        
-        resultPlaceholder.classList.add('hidden');
-        resultLoadingSpinner.classList.add('hidden');
-        
-        // Disable redesign button
-        redesignButton.disabled = true;
+        // Hide the redesign button and show loading spinner
+        redesignButton.classList.add('hidden');
+        redesignLoading.classList.remove('hidden');
         
         try {
             // First, get suggestions from Claude
@@ -607,6 +647,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!suggestions || suggestions.length !== 3) {
                 throw new Error(`Expected 3 suggestions, got ${suggestions ? suggestions.length : 0}`);
             }
+            
+            // Hide upload sections and show results container
+            uploadSectionContainer.classList.add('hidden');
+            redesignButtonContainer.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
             
             // Display suggestion titles in the UI
             const suggestionElements = document.querySelectorAll('.suggestion-item');
@@ -681,6 +726,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // All done
             console.log('Redesign process completed successfully');
             resultLoadingSpinner.classList.add('hidden');
+            redesignButton.classList.remove('hidden');
+            redesignLoading.classList.add('hidden');
             redesignButton.disabled = false;
             isProcessing = false;
             
@@ -870,4 +917,17 @@ document.addEventListener('DOMContentLoaded', () => {
             suggestions.length > 0
         );
     }
+
+    // Handle back button click
+    backButton.addEventListener('click', () => {
+        // Show upload sections and hide results
+        uploadSectionContainer.classList.remove('hidden');
+        redesignButtonContainer.classList.remove('hidden');
+        resultsContainer.classList.add('hidden');
+        
+        // Enable the redesign button 
+        redesignButton.disabled = false;
+        redesignButton.classList.remove('hidden');
+        redesignLoading.classList.add('hidden');
+    });
 }); 

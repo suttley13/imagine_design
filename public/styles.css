@@ -57,7 +57,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: -20px;
     padding: 10px 0;
     border-bottom: 1px solid #ddd;
     height: 60px;
@@ -144,6 +144,30 @@ textarea {
     margin: 0 auto;
 }
 
+/* Small loading spinner for the top right corner */
+.corner-spinner {
+    border-width: 3px;
+    border-top-width: 3px;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+}
+
+/* Result loading container for corner spinner */
+.corner-loading-container {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 100;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -152,43 +176,42 @@ textarea {
 /* Redesign mode layout */
 .redesign-layout {
     display: flex;
+    flex-direction: column;
     height: 100%;
-    gap: 15px;
+    gap: 20px;
+    align-items: center;
+    margin-top: 10px;
 }
 
-/* Left side container */
-.image-upload-container {
-    width: 25%;
+/* Upload section container */
+.upload-section-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    gap: 30px;
+    max-width: 1000px;
+}
+
+/* Redesign button container */
+.redesign-button-container {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    height: 100%;
-    overflow-y: auto;
-    padding-right: 0;
-    min-width: 250px;
-    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    margin-top: 10px;
 }
 
-/* Middle section for suggestions */
-.middle-container {
-    width: 20%;
+/* Results container */
+#results-container {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    height: 100%;
-    min-width: 200px;
+    width: 85%;
+    margin: 30px auto 30px;
 }
 
-/* Right side container */
-.result-container {
-    width: 55%;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    height: 100%;
-    flex-grow: 1;
-}
-
+/* Upload section */
 .upload-section {
     background-color: white;
     padding: 15px;
@@ -200,7 +223,10 @@ textarea {
     display: flex;
     flex-direction: column;
     margin-bottom: 5px;
+    margin-top: 30px;
     overflow: hidden;
+    flex: 1;
+    max-width: 500px;
 }
 
 .upload-section h3 {
@@ -296,7 +322,52 @@ textarea {
     margin: 5px 0 10px 0;
     padding: 12px 20px;
     font-size: 16px;
+    width: 30%;
+}
+
+/* Back button container */
+.back-button-container {
+    position: fixed;
+    left: 20px;
+    top: 84px;
+    z-index: 100;
+}
+
+.back-button {
+    background-color: transparent;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 80px !important;
+    min-width: 80px !important;
+    box-sizing: border-box;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.back-button:hover {
+    background-color: #f5f5f5;
+    border-color: #ccc;
+}
+
+/* Results content wrapper */
+.results-content {
+    display: flex;
     width: 100%;
+    gap: 30px;
+    margin-top: 5px;
+}
+
+/* Middle section for suggestions */
+.middle-container {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    min-width: 250px;
 }
 
 /* Suggestions container */
@@ -305,9 +376,7 @@ textarea {
     padding: 15px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    height: auto;
-    min-height: 280px;
-    max-height: 100%;
+    height: calc(100vh - 170px); /* Fixed height with equal spacing */
     overflow-y: auto;
     flex-grow: 1;
 }
@@ -388,9 +457,11 @@ textarea {
 
 .image-box.result-image {
     flex: 1;
+    height: calc(80vh - 170px); /* Fixed height with equal spacing */
     min-height: 280px;
-    height: 90vh;
-    max-height: 90vh;
+    max-height: calc(82vh); /* Enforce maximum height */
+    position: relative; /* For the corner spinner */
+    overflow: hidden; /* Prevent content from expanding the box */
 }
 
 .image-box h3 {
@@ -400,18 +471,20 @@ textarea {
 
 #result-container {
     position: relative;
-    flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100%;
-    height: calc(90vh - 60px);
+    height: 100%; /* Take full height of parent */
+    max-height: calc(100% - 60px); /* Adjust for the heading */
     overflow: hidden;
 }
 
 #result-image {
     max-width: 100%;
-    max-height: calc(90vh - 80px);
+    max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -446,9 +519,10 @@ textarea {
     font-style: italic;
 }
 
-#result-image:hover {
+/* Remove hover scaling effect */
+/* #result-image:hover {
     transform: scale(1.01);
-}
+} */
 
 #result-image.comparing {
     cursor: grabbing;
@@ -551,7 +625,7 @@ textarea {
     z-index: 100;
     transition: opacity 0.15s ease;
     opacity: 0;
-    background-color: rgba(0,0,0,0.02); /* Very subtle background difference */
+    background-color: transparent; /* Remove gray overlay */
 }
 
 .before-image-container.comparing {
@@ -571,6 +645,10 @@ textarea {
 
 /* Media queries for responsive design */
 @media (max-width: 1200px) {
+    #results-container {
+        width: 95%;
+    }
+    
     .redesign-layout {
         flex-direction: column;
     }
@@ -598,12 +676,22 @@ textarea {
         margin-bottom: 0;
     }
     
-    .middle-container {
+    .left-column {
+        width: 100%;
         margin-bottom: 15px;
     }
     
     .suggestions-container {
         max-height: 300px;
+        height: auto;
+    }
+    
+    .results-content {
+        flex-direction: column;
+    }
+    
+    .result-container {
+        width: 100%;
     }
     
     #redesign-button {
@@ -833,4 +921,27 @@ textarea {
     top: 12px;
     display: inline-block;
     font-size: 0.7em;
+}
+
+/* Right side container */
+.result-container {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex-grow: 1;
+}
+
+/* Redesign loading spinner */
+#redesign-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+#redesign-loading p {
+    font-size: 16px;
+    color: #555;
 } 

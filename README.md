@@ -1,13 +1,59 @@
-# AI Room Redesign App
+# REDESIGN AI PRO
 
-This application uses AI to help users redesign their rooms by providing suggestions based on inspiration images and generating visualizations of the suggested changes.
+An AI-powered room redesign application that transforms your space with personalized design recommendations.
 
 ## Features
 
-- Upload current room and inspiration room images
-- Get AI-powered redesign suggestions from Claude
-- Generate visual representations of the suggestions using Gemini
-- Interactive UI to view and compare different redesign options
+- Upload a photo of your room and an inspiration image
+- Get AI-powered redesign suggestions
+- Generate visual transformations of your space
+- Download high-quality redesigned room images
+- Copy design descriptions to your clipboard
+
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment to Google Cloud Run:
+
+1. **Workflow Trigger**: Automatically triggered on pushes to the `main` branch
+2. **Build Process**: Builds a Docker container image
+3. **Deployment**: Automatically deploys to Google Cloud Run
+4. **Configuration**: The workflow is defined in `.github/workflows/deploy.yml`
+
+### Setting Up GCP Authentication
+
+To enable the GitHub Actions workflow to deploy to Google Cloud Run, you need to:
+
+1. Create a Service Account in Google Cloud with the following roles:
+   - Cloud Run Admin
+   - Storage Admin
+   - Service Account User
+
+2. Create a JSON key for this Service Account
+
+3. Add the key as a GitHub Secret:
+   - Go to your GitHub repository 
+   - Navigate to Settings → Secrets and variables → Actions
+   - Create a new repository secret named `GCP_SA_KEY`
+   - Paste the entire JSON content of your service account key file
+
+## Development Workflow
+
+1. Clone the repository
+2. Make your changes locally
+3. Commit and push to GitHub
+4. GitHub Actions will automatically build and deploy to Cloud Run
+5. Visit the live site at: https://redesignai.pro
+
+## Rollback Process
+
+If you need to roll back to a previous version:
+
+1. In Google Cloud Console, go to Cloud Run → Services → imagine-design
+2. Click the "REVISIONS" tab
+3. Find the revision you want to roll back to
+4. Use the menu (three dots) to select "Direct 100% of traffic"
+
+Alternatively, you can use Git to revert commits and push them to GitHub to trigger a deployment of the previous version.
 
 ## Setup
 

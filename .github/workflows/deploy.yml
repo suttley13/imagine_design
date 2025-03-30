@@ -12,7 +12,7 @@ env:
   PROJECT_ID: designai-454112
   SERVICE_NAME: imagine-design
   REGION: us-central1
-
+  
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -29,21 +29,25 @@ jobs:
 
     - name: 'Set up Cloud SDK'
       uses: 'google-github-actions/setup-gcloud@v1'
-      with:
-        project_id: ${{ env.PROJECT_ID }}
       
-    - name: Authorize Docker push
-      run: gcloud auth configure-docker
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       
     - name: Build and push Docker image
-      run: |
-        docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
-        docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
       
     - name: Deploy to Cloud Run
       uses: google-github-actions/deploy-cloudrun@v1
       with:
         service: ${{ env.SERVICE_NAME }}
-        image: gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+        image: ghcr.io/${{ github.repository }}:${{ github.sha }}
         region: ${{ env.REGION }}
         flags: --allow-unauthenticated

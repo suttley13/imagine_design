@@ -981,6 +981,18 @@ textarea {
     .image-box-dropzone {
         min-height: 15vh;
     }
+    
+    /* Reduce upload section height on mobile */
+    .upload-section {
+        height: 240px;
+        max-height: 240px;
+        min-height: 240px;
+    }
+    
+    /* Reduce padding on upload label for mobile */
+    .upload-label {
+        padding: 48px 0;
+    }
 
     /* Display title centered on mobile */
     .image-box-title {

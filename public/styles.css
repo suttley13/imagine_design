@@ -956,7 +956,7 @@ textarea {
     /* Stack upload sections vertically */
     .upload-section-container {
         flex-direction: column;
-        gap: 10px;
+        gap: 5px; /* Reduced from 10px */
         width: 100%;
         margin-bottom: 0;
     }
@@ -984,9 +984,9 @@ textarea {
     
     /* Reduce upload section height on mobile */
     .upload-section {
-        height: 240px;
-        max-height: 240px;
-        min-height: 240px;
+        height: 230px; /* Changed from 240px */
+        max-height: 230px; /* Changed from 240px */
+        min-height: 230px; /* Changed from 240px */
     }
     
     /* Reduce padding on upload label for mobile */
@@ -1013,9 +1013,9 @@ textarea {
         padding: 15px 15px;
     }
     
-    /* Mobile back button styling */
+    /* Mobile back button styling - position relative to scroll with page */
     .back-button-container {
-        position: fixed;
+        position: absolute;
         left: 10px;
         top: 15px;
     }
@@ -1034,6 +1034,11 @@ textarea {
     .back-button::before {
         content: "←";
         font-size: 16px;  /* Reset font size for the arrow */
+    }
+    
+    /* Hide suggestions div on mobile */
+    .middle-container {
+        display: none;
     }
     
     /* Make suggestions more compact */
@@ -1059,7 +1064,6 @@ textarea {
         gap: 15px;
     }
     
-    .middle-container, 
     .result-container {
         width: 100%;
     }

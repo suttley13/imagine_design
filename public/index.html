@@ -33,7 +33,6 @@
     <div class="container">
         <div class="header">
             <h1 class="logo">REDESIGN<span class="ai">AI</span> PRO</h1>
-            <button class="save-button" onclick="saveResults()" disabled>Save Design</button>
         </div>
 
         <div class="instructions-container">
@@ -147,11 +146,22 @@
                                     <img src="noun-ai-image-7295073.svg" alt="AI Image" class="ai-image-svg">
                                 </div>
                                 <div id="result-container" class="hidden">
-                                    <img id="result-image" src="" alt="Generated redesign">
-                                    <!-- Corner loading spinner -->
+                                    <div id="result-image-container">
+                                        <img id="result-image" alt="Generated redesign">
+                                        <div class="before-image-container">
+                                            <img id="before-image" class="before-image" alt="Original room">
+                                        </div>
+                                    </div>
                                     <div id="corner-loading-spinner" class="corner-loading-container hidden">
                                         <div class="spinner corner-spinner"></div>
                                     </div>
+                                    <button id="download-btn" class="download-button" title="Save Design">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                    </button>
                                 </div>
                                 <div id="result-loading-spinner" class="hidden">
                                     <div class="spinner"></div>

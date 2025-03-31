@@ -939,11 +939,11 @@ textarea {
 }
 
 /* Add styling for the AI text to move it down */
-.ai-text {
+.ai {
+    font-size: 16px;
     position: relative;
-    top: 12px;
-    display: inline-block;
-    font-size: 12px;
+    top: 6px;
+    font-weight: normal;
 }
 
 /* Right side container */
@@ -1158,4 +1158,39 @@ textarea {
     margin: 0;
     min-width: 240px; /* Fixed width to prevent movement */
     text-align: left;
+}
+
+.download-button {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    background-color: rgba(255, 255, 255, 0.85);
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    transition: all 0.2s ease;
+    color: var(--light-blue);
+    opacity: 0;
+}
+
+#result-container:hover .download-button {
+    opacity: 1;
+}
+
+.download-button:hover {
+    background-color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.download-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 } 

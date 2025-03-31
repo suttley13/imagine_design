@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inspirationUploadArea = document.getElementById('inspiration-upload-area');
     
     const redesignButton = document.getElementById('redesign-button');
-    const saveButton = document.querySelector('.save-button');
+    const downloadBtn = document.getElementById('download-btn');
     
     const suggestionsContainer = document.querySelector('.suggestions-container');
     const suggestionsList = document.getElementById('suggestions-list');
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasOriginalImage = originalSelectedImage !== null;
         const hasInspirationImage = inspirationSelectedImage !== null;
         redesignButton.disabled = !(hasOriginalImage && hasInspirationImage);
-        updateSaveButtonState();
+        updateDownloadButtonState();
     }
     
     // Add click-and-hold functionality to show original image
@@ -475,8 +475,8 @@ document.addEventListener('DOMContentLoaded', () => {
         redesignButtonContainer.classList.remove('hidden');
         resultsContainer.classList.add('hidden');
         
-        // Enable save button if we have results
-        updateSaveButtonState();
+        // Enable download button if we have results
+        updateDownloadButtonState();
     }
     
     // Process a single suggestion with Gemini
@@ -611,8 +611,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     setupBeforeAfterComparison();
                 }
                 
-                // Enable the save button now that we have a result
-                updateSaveButtonState();
+                // Enable the download button now that we have a result
+                updateDownloadButtonState();
                 
                 return {
                     success: true,
@@ -895,85 +895,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle save button click
-    saveButton.addEventListener('click', async () => {
-        if (!suggestions.length || !resultImage.src) {
-            showAlert('No results to save yet', true);
-            return;
-        }
-        
-        try {
-            // Always use the third (final) generated image as the result
-            let finalResultImageUrl = null;
-            if (generatedImagesHistory.length >= 3 && generatedImagesHistory[2] && generatedImagesHistory[2].imageUrl) {
-                finalResultImageUrl = generatedImagesHistory[2].imageUrl;
-            } else {
-                // Fallback to current displayed image if third isn't available
-                finalResultImageUrl = resultImage.src;
-            }
-            
-            // Extract the relative paths for the server
-            const resultPath = new URL(finalResultImageUrl, window.location.href).pathname;
-            
-            // Send the request to prepare the download
-            const response = await fetch('/api/save-results', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    result_image: resultPath,
-                    suggestions: suggestions
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to prepare download');
-            }
-            
-            const data = await response.json();
-            
-            // Copy the content to clipboard
-            await navigator.clipboard.writeText(data.clipboard_content);
-            
-            // Trigger the download by creating a link and clicking it
-            if (data.download_url) {
-                // Create a hidden anchor element for the download
-                const downloadLink = document.createElement('a');
-                downloadLink.href = data.download_url;
-                downloadLink.download = 'redesign_result.jpg'; // Add a default filename
-                downloadLink.setAttribute('download', ''); // Ensure it's a download
-                downloadLink.style.display = 'none';
-                document.body.appendChild(downloadLink);
-                
-                // Trigger the download
-                downloadLink.click();
-                
-                // Clean up
-                setTimeout(() => {
-                    document.body.removeChild(downloadLink);
-                }, 100);
-                
-                // Show success message
-                showAlert('Final redesign image downloading and descriptions copied to clipboard', false);
-            } else {
-                throw new Error('No download URL provided');
-            }
-            
-        } catch (error) {
-            console.error('Error saving results:', error);
-            showAlert(`Error: ${error.message}`, true);
-        }
-    });
-
-    // Define updateSaveButtonState function
-    function updateSaveButtonState() {
-        if (saveButton) {
-            saveButton.disabled = !(
+    // Define updateDownloadButtonState function
+    function updateDownloadButtonState() {
+        if (downloadBtn) {
+            downloadBtn.disabled = !(
                 generatedImagesHistory.length > 0 && 
                 resultImage.src && 
                 suggestions.length > 0
             );
+            
+            if (downloadBtn.disabled) {
+                downloadBtn.style.display = 'none';
+            } else {
+                downloadBtn.style.display = 'flex';
+            }
         }
     }
 
@@ -1007,5 +942,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // When results are ready:
         // loadingContainer.style.display = 'none';
         // resultsContent.style.display = 'flex';
+    }
+
+    // Add event listener for download button
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', saveResults);
+    }
+
+    // Function to save results
+    function saveResults() {
+        if (resultImage.src) {
+            const link = document.createElement('a');
+            link.download = 'redesignai_result.jpg';
+            link.href = resultImage.src;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
 }); 

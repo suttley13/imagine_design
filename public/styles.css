@@ -5,6 +5,11 @@
     padding: 0;
 }
 
+:root {
+    --light-gray: #aaaaaa;
+    --light-blue: #1082e9;
+}
+
 /* Import Playfair Display font (alternative to Didot) */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
 
@@ -68,6 +73,7 @@ h1 {
     color: #000000;
     font-family: 'Playfair Display', 'Didot', serif;
     font-weight: 700;
+    font-size: 24px;
     text-transform: uppercase;
     line-height: 1;
     margin: 0;
@@ -137,7 +143,7 @@ textarea {
 .spinner {
     border: 5px solid #f3f3f3;
     border-radius: 50%;
-    border-top: 5px solid #4CAF50;
+    border-top: 5px solid var(--light-blue);
     width: 50px;
     height: 50px;
     animation: spin 1s linear infinite;
@@ -217,16 +223,16 @@ textarea {
     padding: 15px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    height: 280px;
-    max-height: 280px;
-    min-height: 280px;
+    height: 380px;
+    max-height: 380px;
+    min-height: 380px;
     display: flex;
     flex-direction: column;
     margin-bottom: 5px;
-    margin-top: 30px;
+    margin-top: 140px;
     overflow: hidden;
     flex: 1;
-    max-width: 500px;
+    max-width: 1000px;
 }
 
 .upload-section h3 {
@@ -265,13 +271,13 @@ textarea {
     height: 70px;
     opacity: 1;
     transition: all 0.3s ease;
-    filter: brightness(0);
+    filter: brightness(0) saturate(100%) invert(47%) sepia(82%) saturate(1679%) hue-rotate(189deg) brightness(98%) contrast(96%);
 }
 
 .upload-label:hover .upload-svg {
     opacity: 1;
     transform: scale(1.05);
-    filter: brightness(0);
+    filter: brightness(0) saturate(100%) invert(47%) sepia(82%) saturate(1679%) hue-rotate(189deg) brightness(98%) contrast(96%);
 }
 
 #original-preview-container,
@@ -320,9 +326,26 @@ textarea {
 
 #redesign-button {
     margin: 5px 0 10px 0;
-    padding: 12px 20px;
-    font-size: 16px;
+    padding: 32px 24px;
+    font-size: 24px;
     width: 30%;
+    background: rgb(16,130,233);
+    background: linear-gradient(37deg, rgba(16,130,233,1) 0%, rgba(0,69,255,1) 35%, rgba(0,212,255,1) 100%);
+    transition: all 0.3s;
+}
+
+#redesign-button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+#redesign-button:disabled {
+    background: transparent;
+    border: 1px solid var(--light-gray);
+    color: var(--light-gray);
+    cursor: not-allowed;
+    opacity: 1;
+    transform: none;
 }
 
 /* Back button container */
@@ -824,11 +847,11 @@ textarea {
     cursor: pointer;
     font-weight: 700;
     transition: all 0.3s ease;
-    font-family: 'Playfair Display', 'Didot', serif;
-    text-transform: uppercase;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
     letter-spacing: 0.05em;
-    padding-top: 10px;
-    padding-bottom: 6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
 }
 
 .save-button:hover {
@@ -838,8 +861,8 @@ textarea {
 
 .save-button:disabled {
     background-color: transparent;
-    color: #a0a0a0;
-    border-color: #a0a0a0;
+    color: var(--light-gray);
+    border-color: var(--light-gray);
     cursor: not-allowed;
 }
 
@@ -920,7 +943,7 @@ textarea {
     position: relative;
     top: 12px;
     display: inline-block;
-    font-size: 0.7em;
+    font-size: 12px;
 }
 
 /* Right side container */

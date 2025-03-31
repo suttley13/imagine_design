@@ -32,8 +32,28 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1><span class="redesign-text">REDESIGN</span><span class="ai-text">AI</span><span class="pro-text"> PRO</span></h1>
-            <button id="save-button" type="button" class="save-button" disabled>Save Design</button>
+            <h1 class="logo">REDESIGN<span class="ai">AI</span> PRO</h1>
+            <button class="save-button" onclick="saveResults()" disabled>Save Design</button>
+        </div>
+
+        <div class="instructions-container">
+            <div class="instruction-step">
+                <div class="step-number">1</div>
+                <div class="step-text">Upload image of your room</div>
+            </div>
+            <div class="instruction-step">
+                <div class="step-number">2</div>
+                <div class="step-text">Add an inspiration image</div>
+            </div>
+            <div class="instruction-step">
+                <div class="step-number">3</div>
+                <div class="step-text">Create your redesign</div>
+            </div>
+        </div>
+
+        <div class="loading-container" style="display: none;">
+            <div class="spinner"></div>
+            <div id="loading-text-cycle" class="loading-text">Analyzing your room...</div>
         </div>
 
         <div id="redesign-mode">

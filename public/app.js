@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inspirationUploadArea = document.getElementById('inspiration-upload-area');
     
     const redesignButton = document.getElementById('redesign-button');
-    const saveButton = document.getElementById('save-button');
+    const saveButton = document.querySelector('.save-button');
     
     const suggestionsContainer = document.querySelector('.suggestions-container');
     const suggestionsList = document.getElementById('suggestions-list');
@@ -38,6 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const cornerLoadingSpinner = document.getElementById('corner-loading-spinner');
     
+    const instructionsContainer = document.querySelector('.instructions-container');
+    const loadingContainer = document.querySelector('.loading-container');
+    const loadingTextElement = document.getElementById('loading-text-cycle');
+    
     let originalSelectedImage = null;
     let inspirationSelectedImage = null;
     let currentSuggestionIndex = 0;
@@ -45,6 +49,38 @@ document.addEventListener('DOMContentLoaded', () => {
     let suggestions = [];
     let generatedImagesHistory = []; // Store history of generated images
     let originalImageUrl = null; // Store URL of original image for comparison
+    
+    // Loading message cycling
+    let loadingTextInterval;
+    const loadingMessages = [
+        "Analyzing your room...",
+        "Reviewing the inspiration...",
+        "Developing a color palette...",
+        "Refining suggestions..."
+    ];
+
+    function startLoadingTextCycle() {
+        let index = 0;
+        loadingTextElement.textContent = loadingMessages[index];
+        
+        loadingTextInterval = setInterval(() => {
+            index = (index + 1) % loadingMessages.length;
+            loadingTextElement.textContent = loadingMessages[index];
+            
+            // If we've reached "Refining suggestions" (the last message), stop cycling
+            if (index === loadingMessages.length - 1) {
+                clearInterval(loadingTextInterval);
+                loadingTextInterval = null;
+            }
+        }, 2300);
+    }
+
+    function stopLoadingTextCycle() {
+        if (loadingTextInterval) {
+            clearInterval(loadingTextInterval);
+            loadingTextInterval = null;
+        }
+    }
     
     // Add this function near the top of the file, after variable declarations
     function showAlert(message, isError = true) {
@@ -602,10 +638,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log('Starting redesign process');
         
-        // Hide the redesign button and show loading spinner
-        redesignButton.classList.add('hidden');
-        redesignLoading.classList.remove('hidden');
-        
         try {
             // First, get suggestions from Claude
             console.log('Requesting suggestions from Claude');
@@ -627,6 +659,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const errorMessage = errorData.error || claudeResponse.statusText;
                 console.error('Claude API error:', errorMessage);
                 
+                // Stop loading messages cycle
+                stopLoadingTextCycle();
+                
                 // Show a more user-friendly message for known errors
                 if (errorMessage.includes('HEIC') || errorMessage.includes('heic')) {
                     showAlert('We attempted to convert your HEIC image but encountered an issue. Please convert it to JPEG format using Photos app or similar before uploading.', true);
@@ -642,6 +677,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const claudeData = await claudeResponse.json();
             suggestions = claudeData.suggestions;
             
+            // Stop loading messages cycle
+            stopLoadingTextCycle();
+            
             console.log('Received suggestions from Claude:', suggestions);
             
             if (!suggestions || suggestions.length !== 3) {
@@ -652,6 +690,9 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadSectionContainer.classList.add('hidden');
             redesignButtonContainer.classList.add('hidden');
             resultsContainer.classList.remove('hidden');
+            
+            // Hide loading container once we show results
+            if (loadingContainer) loadingContainer.style.display = 'none';
             
             // Display suggestion titles in the UI
             const suggestionElements = document.querySelectorAll('.suggestion-item');
@@ -737,12 +778,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error in redesign process:', error);
             
+            // Stop loading messages cycle
+            stopLoadingTextCycle();
+            
             // Check for specific error types
             if (error.message.includes('HEIC') || error.message.includes('heic')) {
                 showAlert('We attempted to convert your HEIC image but encountered an issue. Please convert it to JPEG format using Photos app or similar before uploading.', true);
             } else {
                 showAlert(`Error: ${error.message}`);
             }
+            
+            // Hide loading container on error
+            if (loadingContainer) loadingContainer.style.display = 'none';
             
             resetProcessing();
         }
@@ -757,6 +804,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             console.log('Tracked: Clicked_Redesign_Button event');
         }
+        
+        // Hide instructions and show loading spinner
+        if (instructionsContainer) instructionsContainer.style.display = 'none';
+        if (loadingContainer) loadingContainer.style.display = 'flex';
+        
+        // Start cycling loading messages
+        startLoadingTextCycle();
+        
+        // Don't show the redesign loading spinner, just disable the button
+        redesignButton.disabled = true;
         
         runRedesignProcess();
     });
@@ -911,11 +968,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Define updateSaveButtonState function
     function updateSaveButtonState() {
-        saveButton.disabled = !(
-            generatedImagesHistory.length > 0 && 
-            resultImage.src && 
-            suggestions.length > 0
-        );
+        if (saveButton) {
+            saveButton.disabled = !(
+                generatedImagesHistory.length > 0 && 
+                resultImage.src && 
+                suggestions.length > 0
+            );
+        }
     }
 
     // Handle back button click
@@ -925,9 +984,28 @@ document.addEventListener('DOMContentLoaded', () => {
         redesignButtonContainer.classList.remove('hidden');
         resultsContainer.classList.add('hidden');
         
+        // Show instructions div again
+        if (instructionsContainer) instructionsContainer.style.display = 'flex';
+        if (loadingContainer) loadingContainer.style.display = 'none';
+        
         // Enable the redesign button 
         redesignButton.disabled = false;
         redesignButton.classList.remove('hidden');
         redesignLoading.classList.add('hidden');
     });
+
+    function handleRedesign() {
+        const instructionsContainer = document.querySelector('.instructions-container');
+        const loadingContainer = document.querySelector('.loading-container');
+        const resultsContent = document.querySelector('.results-content');
+        
+        // Hide instructions and show loading spinner
+        if (instructionsContainer) instructionsContainer.style.display = 'none';
+        loadingContainer.style.display = 'flex';
+        
+        // Your existing redesign logic here
+        // When results are ready:
+        // loadingContainer.style.display = 'none';
+        // resultsContent.style.display = 'flex';
+    }
 }); 

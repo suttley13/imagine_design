@@ -922,149 +922,120 @@ document.addEventListener('DOMContentLoaded', () => {
             suggestionStatuses[suggestionIndex].classList.remove('active');
             suggestionStatuses[suggestionIndex].classList.add('loading');
             
-            // Create FormData for image upload
-            const formData = new FormData();
+            // Show result as loading
+            resultPlaceholder.classList.add('hidden');
+            resultImage.classList.add('hidden');
+            resultLoadingSpinner.classList.remove('hidden');
+            
+            // Use URL directly if sourceImage is a string URL
+            let formData = new FormData();
+            let imageFile;
+            
+            // Handle different sourceImage types
+            if (typeof sourceImage === 'string') {
+                // It's a URL - need to fetch it and convert to file
+                console.log('Source is a URL, fetching...');
+                try {
+                    const response = await fetch(sourceImage);
+                    const blob = await response.blob();
+                    imageFile = new File([blob], "processed_image.jpg", { type: 'image/jpeg' });
+                } catch (e) {
+                    console.error('Error fetching source image:', e);
+                    throw new Error('Could not load source image');
+                }
+            } else if (sourceImage instanceof File) {
+                // It's already a file
+                imageFile = sourceImage;
+            } else {
+                throw new Error('Invalid source image format');
+            }
+            
+            // Add image and suggestion text to form data
+            formData.append('image', imageFile);
             formData.append('message', suggestionText);
             
-            // Use either a File object or a URL depending on the source
-            if (sourceImage instanceof File) {
-                // Direct file upload from the first step
-                formData.append('image', sourceImage);
-            } else if (typeof sourceImage === 'string' && sourceImage.startsWith('data:')) {
-                // Convert dataURL to File object
-                const response = await fetch(sourceImage);
-                const blob = await response.blob();
-                const file = new File([blob], "image.jpg", { type: "image/jpeg" });
-                formData.append('image', file);
-            } else if (typeof sourceImage === 'string' && (sourceImage.startsWith('/') || sourceImage.startsWith('http'))) {
-                // Handle relative or absolute URLs from previous steps
-                const fullUrl = sourceImage.startsWith('/') ? window.location.origin + sourceImage : sourceImage;
-                console.log('Fetching image from URL:', fullUrl);
-                
-                try {
-                    const response = await fetch(fullUrl);
-                    if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
-                    
-                    const blob = await response.blob();
-                    const file = new File([blob], "image.jpg", { type: blob.type || "image/jpeg" });
-                    formData.append('image', file);
-                } catch (fetchError) {
-                    console.error('Error fetching image:', fetchError);
-                    throw new Error('Could not load the image from the previous step');
-                }
-            } else {
-                throw new Error('Invalid image source: ' + (typeof sourceImage));
-            }
-            
-            // Prepare request with authentication if available
-            const requestOptions = {
-                method: 'POST',
-                body: formData
-            };
-            
-            // Add auth header if logged in
+            // Prepare headers for authentication
+            const headers = {};
             if (authState.token) {
-                requestOptions.headers = {
-                    'Authorization': `Bearer ${authState.token}`
-                };
+                headers['Authorization'] = `Bearer ${authState.token}`;
             }
             
-            // Send to server
-            console.log('Sending request to Gemini API');
-            const response = await fetch('/api/chat-with-image', requestOptions);
+            // Show loading spinner in corner while processing
+            cornerLoadingSpinner.classList.remove('hidden');
             
-            if (!response.ok) {
-                // Check if authentication error
-                const errorData = await response.json();
-                if (handleAuthError(errorData.error)) {
-                    isProcessing = false;
-                    return { success: false, error: 'Authentication required' };
-                }
-                throw new Error('Network response was not ok');
-            }
+            // Make the API request with proper authentication
+            console.log('Sending suggestion to API');
+            const response = await fetch('/api/chat-with-image', {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            });
             
             const data = await response.json();
-            console.log('Response data for suggestion', suggestionIndex + 1, data);
             
-            // Check if we got images back
+            // Handle errors
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to process suggestion');
+            }
+            
+            // Hide corner spinner
+            cornerLoadingSpinner.classList.add('hidden');
+            
+            // Log response
+            console.log('Received response:', data);
+            
+            // Update UI with the image result
             if (data.images && data.images.length > 0) {
-                // Get the first image URL
                 const imageUrl = data.images[0];
-                
-                // Store this image in our history at the correct index
-                generatedImagesHistory[suggestionIndex] = {
-                    suggestion: suggestionText,
-                    imageUrl: imageUrl
-                };
-                
-                // Set the result image
                 resultImage.src = imageUrl;
-                resultPlaceholder.classList.add('hidden');
-                resultContainer.classList.remove('hidden');
+                resultImage.classList.remove('hidden');
                 resultLoadingSpinner.classList.add('hidden');
                 
-                // Show this image to the user
-                // Add a visual indicator for the current step
-                suggestionStatuses.forEach((status, idx) => {
-                    status.classList.remove('selected');
-                    if (idx === suggestionIndex) {
-                        status.classList.add('selected');
-                    }
+                // Update the "before after" comparison if available
+                setupBeforeAfterComparison();
+                
+                // Save the generated image to history
+                generatedImagesHistory.push({
+                    index: suggestionIndex,
+                    imageUrl: imageUrl,
+                    description: suggestionText
                 });
+                
+                // Update download button state
+                updateDownloadButtonState();
                 
                 // Mark this suggestion as completed
                 suggestionStatuses[suggestionIndex].classList.remove('loading');
                 suggestionStatuses[suggestionIndex].classList.add('completed');
                 
-                // Immediately show spinner on the next suggestion if not the last one
-                if (suggestionIndex < 2) {
-                    // Immediately show the spinner on the next suggestion
-                    suggestionStatuses[suggestionIndex + 1].classList.add('loading');
-                    
-                    // If it's not the last image, wait a bit before moving to the next step
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                // Activate next suggestion if available
+                if (suggestionIndex < suggestionStatuses.length - 1) {
+                    suggestionStatuses[suggestionIndex + 1].classList.add('active');
                 }
                 
-                // Add click event listener to the suggestion status
-                suggestionStatuses[suggestionIndex].addEventListener('click', () => {
-                    // Remove selected class from all statuses
-                    suggestionStatuses.forEach(s => s.classList.remove('selected'));
-                    
-                    // Add selected class to this status
-                    suggestionStatuses[suggestionIndex].classList.add('selected');
-                    
-                    // Display this image
-                    resultImage.src = imageUrl;
-                    resultContainer.classList.remove('hidden');
-                    resultLoadingSpinner.classList.add('hidden');
-                    
-                    // Setup before/after comparison for this result
-                    setupBeforeAfterComparison();
-                });
-                
-                // If there's more than one image in history, show the click hint
-                if (generatedImagesHistory.filter(img => img).length > 1) {
-                    clickHint.classList.remove('hidden');
-                }
-                
-                // Setup before/after comparison for this result
-                if (suggestionIndex === 0) {
-                    setupBeforeAfterComparison();
-                }
-                
-                // Enable the download button now that we have a result
-                updateDownloadButtonState();
-                
+                // Return success
                 return {
                     success: true,
                     resultImageUrl: imageUrl
                 };
             } else {
-                throw new Error('No image was returned');
+                throw new Error('No image was generated');
             }
-            
         } catch (error) {
-            console.error('Error in suggestion', suggestionIndex + 1, error);
+            console.error(`Error processing suggestion ${suggestionIndex + 1}:`, error);
+            
+            // Update UI to show error state
+            suggestionStatuses[suggestionIndex].classList.remove('loading');
+            suggestionStatuses[suggestionIndex].classList.add('error');
+            
+            // Hide corner spinner
+            cornerLoadingSpinner.classList.add('hidden');
+            
+            // Show placeholder for error
+            resultLoadingSpinner.classList.add('hidden');
+            resultPlaceholder.classList.remove('hidden');
+            
+            // Return failure
             return {
                 success: false,
                 error: error.message
@@ -1074,167 +1045,131 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Generate suggestions from Claude and process them with Gemini
     async function runRedesignProcess() {
-        if (isProcessing) return;
-        isProcessing = true;
+        if (isProcessing || !originalSelectedImage || !inspirationSelectedImage) {
+            return;
+        }
         
-        console.log('Starting redesign process');
+        // Check if we need to authenticate
+        if (!authState.isAuthenticated && (authState.remainingUsage <= 0)) {
+            console.log('No remaining usage, showing auth required modal');
+            showModal(authRequiredModal);
+            return;
+        }
         
         try {
-            // First, get suggestions from Claude
-            console.log('Requesting suggestions from Claude');
+            isProcessing = true;
+            console.log('Starting redesign process');
             
-            // Create FormData with both images
+            // Hide content, show loading
+            uploadSectionContainer.classList.add('hidden');
+            redesignButtonContainer.classList.add('hidden');
+            redesignLoading.classList.remove('hidden');
+            instructionsContainer.classList.add('hidden');
+            loadingContainer.classList.remove('hidden');
+            
+            // Start loading animation
+            startLoadingTextCycle();
+            
+            // Reset state
+            generatedImagesHistory = [];
+            suggestions = [];
+            currentSuggestionIndex = 0;
+            
+            // Reset UI
+            document.querySelectorAll('.suggestion-status').forEach(el => {
+                el.classList.remove('active', 'completed', 'loading');
+            });
+            document.querySelectorAll('.suggestion-text').forEach(el => {
+                el.textContent = '';
+            });
+            
+            // Create form data with both images
             const formData = new FormData();
             formData.append('original', originalSelectedImage);
             formData.append('inspiration', inspirationSelectedImage);
             
-            // Add auth headers if logged in
-            const requestOptions = {
-                method: 'POST',
-                body: formData
-            };
-            
+            // Prepare headers for authentication
+            const headers = {};
             if (authState.token) {
-                requestOptions.headers = {
-                    'Authorization': `Bearer ${authState.token}`
-                };
+                headers['Authorization'] = `Bearer ${authState.token}`;
             }
             
-            // Get suggestions from Claude
-            const claudeResponse = await fetch('/api/claude-suggestions', requestOptions);
+            // Get suggestions from the server
+            console.log('Fetching redesign suggestions');
+            const response = await fetch('/api/claude-suggestions', {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            });
             
-            // Check if we have an error response
-            if (!claudeResponse.ok) {
-                const errorData = await claudeResponse.json();
-                const errorMessage = errorData.error || claudeResponse.statusText;
-                console.error('Claude API error:', errorMessage);
-                
-                // Stop loading messages cycle
+            // Handle possible 401 unauthorized
+            if (response.status === 401) {
+                const data = await response.json();
+                console.log('Authentication required:', data);
+                isProcessing = false;
+                redesignLoading.classList.add('hidden');
+                uploadSectionContainer.classList.remove('hidden');
+                redesignButtonContainer.classList.remove('hidden');
+                instructionsContainer.classList.remove('hidden');
+                loadingContainer.classList.add('hidden');
                 stopLoadingTextCycle();
                 
-                // Check if authentication error
-                if (handleAuthError(errorData)) {
-                    // Auth error handled, reset processing state
-                    isProcessing = false;
-                    resetProcessing();
-                    return;
-                }
-                
-                // Show a more user-friendly message for known errors
-                if (errorMessage.includes('HEIC') || errorMessage.includes('heic')) {
-                    showAlert('We attempted to convert your HEIC image but encountered an issue. Please convert it to JPEG format using Photos app or similar before uploading.', true);
-                } else if (errorMessage.includes('overloaded')) {
-                    showAlert('The AI service is currently experiencing high demand. Please wait a moment and try again.', true);
+                if (data.error === 'ANONYMOUS_USAGE_LIMIT') {
+                    showModal(authRequiredModal);
                 } else {
-                    showAlert(`Error: ${errorMessage}`);
+                    // Token might be expired, clear it and update UI
+                    clearAuthToken();
+                    authState.isAuthenticated = false;
+                    authState.user = null;
+                    updateAuthUI();
+                    showModal(authRequiredModal);
                 }
-                
-                throw new Error(`Claude API error: ${errorMessage}`);
+                return;
             }
             
-            const claudeData = await claudeResponse.json();
-            suggestions = claudeData.suggestions;
+            // Parse JSON response
+            const data = await response.json();
             
-            // Stop loading messages cycle
-            stopLoadingTextCycle();
-            
-            console.log('Received suggestions from Claude:', suggestions);
-            
-            if (!suggestions || suggestions.length !== 3) {
-                throw new Error(`Expected 3 suggestions, got ${suggestions ? suggestions.length : 0}`);
+            // Check for error
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to get redesign suggestions');
             }
             
-            // Hide upload sections and show results container
-            uploadSectionContainer.classList.add('hidden');
-            redesignButtonContainer.classList.add('hidden');
-            resultsContainer.classList.remove('hidden');
+            // Use the suggestions
+            suggestions = data.suggestions;
+            console.log('Received suggestions:', suggestions);
             
-            // Hide loading container once we show results
-            if (loadingContainer) loadingContainer.style.display = 'none';
-            
-            // Display suggestion titles in the UI
-            const suggestionElements = document.querySelectorAll('.suggestion-item');
-            suggestionElements.forEach((element, index) => {
-                if (index < suggestions.length) {
-                    const titleElement = element.querySelector('.suggestion-text');
-                    // Remove the number prefix (like "1. " or "2. ") from the title
-                    const cleanTitle = suggestions[index].title.replace(/^\d+\.\s*/, '');
-                    titleElement.textContent = cleanTitle;
-                    titleElement.setAttribute('data-description', suggestions[index].description);
-                    
-                    // Add click event to show description in modal
-                    titleElement.addEventListener('click', () => {
-                        // Also use the clean title for the modal
-                        showDescriptionModal(cleanTitle, suggestions[index].description);
-                    });
-                    
-                    // Add tooltip
-                    titleElement.title = "Click to view full description";
-                    
-                    // Add clickable styling
-                    titleElement.classList.add('clickable-title');
-                }
-            });
-            
-            // Show suggestions and hide loading
+            // Update the UI with suggestions
             suggestionsPlaceholder.classList.add('hidden');
-            suggestionsLoading.classList.add('hidden');
-            suggestionsContainer.classList.remove('hidden');
-            const suggestionsList = document.getElementById('suggestions-list');
-            suggestionsList.classList.remove('hidden');
             
-            // Reset suggestion statuses
-            suggestionStatuses.forEach(status => {
-                status.classList.remove('completed');
-                status.classList.remove('active');
-                status.classList.remove('selected');
-                status.classList.remove('loading');
-            });
-            
-            // Process the first suggestion immediately
-            suggestionStatuses[0].classList.add('loading');
-            const result1 = await processSuggestion(originalSelectedImage, suggestions[0].description, 0);
-            
-            if (!result1.success) {
-                throw new Error(`Failed to process first suggestion: ${result1.error}`);
+            for (let i = 0; i < suggestions.length; i++) {
+                const suggestion = suggestions[i];
+                suggestionTexts[i].textContent = suggestion.title;
             }
             
-            // Enable hints after first suggestion
+            // Activate the first suggestion
+            suggestionStatuses[0].classList.add('active');
             suggestionsClickHint.classList.remove('hidden');
             
-            // Process the second suggestion
-            const result2 = await processSuggestion(result1.resultImageUrl, suggestions[1].description, 1);
+            // Show results container
+            resultsContainer.classList.remove('hidden');
             
-            if (!result2.success) {
-                // If second suggestion fails but first succeeded, we can still show the first result
-                console.error('Second suggestion failed, but continuing with available results');
-            } else {
-                // Process the third suggestion
-                const result3 = await processSuggestion(result2.resultImageUrl, suggestions[2].description, 2);
-                
-                if (!result3.success) {
-                    console.error('Third suggestion failed, but continuing with available results');
-                }
-            }
+            // Update usage count
+            checkAuthStatus();
             
-            // Update anonymous usage count
-            if (!authState.isAuthenticated) {
-                checkAuthStatus();
-            }
+            // Process first suggestion automatically
+            await processSuggestion(originalImageUrl, suggestions[0].description, 0);
             
         } catch (error) {
             console.error('Error in redesign process:', error);
-            showAlert(`Error: ${error.message}`, true);
-            // Reset processing state
+            showAlert('Error getting redesign suggestions: ' + error.message);
+            
+            // Reset UI
             resetProcessing();
         } finally {
-            // Ensure the loading container is hidden
-            if (loadingContainer) loadingContainer.style.display = 'none';
+            // Hide loading, show content
+            redesignLoading.classList.add('hidden');
             
-            // Re-enable the button after processing
-            if (document.body.contains(redesignButton)) {
-                redesignButton.disabled = false;
-            }
             isProcessing = false;
         }
     }

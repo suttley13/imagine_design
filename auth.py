@@ -70,13 +70,29 @@ def auth_required(f):
             # If under limit, allow request
             if usage_count < MAX_ANONYMOUS_USAGE:
                 return f(*args, **kwargs)
+            else:
+                # User has exceeded anonymous usage limit
+                return jsonify({
+                    'error': 'ANONYMOUS_USAGE_LIMIT',
+                    'message': f'You have used all your {MAX_ANONYMOUS_USAGE} anonymous redesigns. Please sign in or register to continue.',
+                    'code': 'AUTH_REQUIRED'
+                }), 401
         
-        # If user has no ID or is over limit, return error
-        return jsonify({
-            'error': 'Authentication required',
-            'message': 'You have used all your anonymous redesigns. Please sign in or register to continue.',
-            'code': 'AUTH_REQUIRED'
-        }), 401
+        # If user has no ID at all, create one and allow first access
+        new_anonymous_id = str(uuid.uuid4())
+        response = f(*args, **kwargs)
+        
+        # If response is a tuple, get the response object
+        if isinstance(response, tuple):
+            resp_obj = response[0]
+        else:
+            resp_obj = response
+            
+        # Set the cookie if response is a Response object
+        if hasattr(resp_obj, 'set_cookie'):
+            resp_obj.set_cookie(ANONYMOUS_COOKIE_NAME, new_anonymous_id, max_age=60*60*24*365, httponly=True, samesite='Strict')
+            
+        return response
     
     return decorated_function
 

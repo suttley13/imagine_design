@@ -49,13 +49,31 @@ logger.info("Environment variables loaded")
 from config import config
 
 # Get configuration mode
-config_name = os.environ.get('FLASK_CONFIG') or 'default'
+config_name = os.environ.get('FLASK_CONFIG', 'default')
+# Clean up config_name if it's corrupted with other env vars
+if ' ' in config_name:
+    logger.warning(f"FLASK_CONFIG appears to be corrupted: {config_name}")
+    # Extract the actual config name (first word)
+    config_name = config_name.split(' ')[0]
+    logger.info(f"Using extracted config name: {config_name}")
+
 logger.info(f"Using configuration: {config_name}")
 
-# Apply configuration
-app.config.from_object(config[config_name])
-config[config_name].init_app(app)
-logger.info("Configuration applied")
+# Apply configuration with error handling
+try:
+    app.config.from_object(config[config_name])
+    config[config_name].init_app(app)
+    logger.info("Configuration applied")
+except KeyError:
+    logger.error(f"Invalid config name: {config_name}, using default instead")
+    app.config.from_object(config['default'])
+    config['default'].init_app(app)
+except Exception as e:
+    logger.error(f"Error applying configuration: {str(e)}")
+    logger.error(traceback.format_exc())
+    # Use default configuration as fallback
+    app.config.from_object(config['default'])
+    config['default'].init_app(app)
 
 # Initialize database before importing models
 from flask_sqlalchemy import SQLAlchemy

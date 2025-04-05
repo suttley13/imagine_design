@@ -55,6 +55,46 @@ class ProductionConfig(Config):
 
 # Cloud Run configuration
 class CloudRunConfig(ProductionConfig):
+    """Configuration for Google Cloud Run deployment"""
+    
+    # Cloud Run specific settings
+    DEBUG = False
+    PREFERRED_URL_SCHEME = 'https'
+    
+    # Set database URL
+    db_url = os.environ.get('DATABASE_URL')
+    
+    # If DB_URL contains spaces, it might be corrupted
+    if db_url and ' ' in db_url:
+        # Try to extract actual database URL
+        logger.warning(f"DATABASE_URL appears to be malformed: {db_url[:20]}...")
+        try:
+            # Try to extract the PostgreSQL URL
+            if 'postgresql' in db_url:
+                parts = db_url.split(' ')
+                for part in parts:
+                    if part.startswith('postgresql'):
+                        db_url = part
+                        logger.info(f"Extracted clean DATABASE_URL")
+                        break
+        except Exception as e:
+            logger.error(f"Failed to clean DATABASE_URL: {str(e)}")
+            db_url = None
+            
+    # Set the database URL
+    if db_url:
+        SQLALCHEMY_DATABASE_URI = db_url
+    else:
+        # Fallback to standard Cloud SQL connection format
+        logger.warning("Using fallback Cloud SQL connection string")
+        instance = os.environ.get('INSTANCE_CONNECTION_NAME', 
+                                 'designai-454112:us-central1:redesign-ai-db')
+        db_name = os.environ.get('DB_NAME', 'redesign_db')
+        db_user = os.environ.get('DB_USER', 'postgres')
+        db_pass = os.environ.get('DB_PASS', '')
+        
+        SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_pass}@/{db_name}?host=/cloudsql/{instance}"
+    
     @staticmethod
     def init_app(app):
         ProductionConfig.init_app(app)
@@ -64,6 +104,14 @@ class CloudRunConfig(ProductionConfig):
         
         # Cloud Run specific configurations
         app.config['PREFERRED_URL_SCHEME'] = 'https'
+        
+        # Add Cloud Run-specific error logging
+        import logging
+        from logging import StreamHandler
+        
+        stream_handler = StreamHandler()
+        stream_handler.setLevel(logging.INFO)
+        app.logger.addHandler(stream_handler)
         
         # Additional Cloud Run specific settings could go here
         logger.info("Cloud Run configuration complete")

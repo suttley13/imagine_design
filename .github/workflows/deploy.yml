@@ -88,7 +88,7 @@ jobs:
         image: gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         region: ${{ env.REGION }}
         flags: --allow-unauthenticated --add-cloudsql-instances=${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DATABASE_INSTANCE }}
-        env_vars: >-
+        env_vars: |
           FLASK_CONFIG=cloud_run
           DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@localhost/${{ env.DATABASE_NAME }}?host=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DATABASE_INSTANCE }}
           SECRET_KEY=${{ secrets.SECRET_KEY }}
@@ -96,3 +96,7 @@ jobs:
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
           CLAUDE_MODEL=${{ secrets.CLAUDE_MODEL }}
+          INSTANCE_CONNECTION_NAME=${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DATABASE_INSTANCE }}
+          DB_NAME=${{ env.DATABASE_NAME }}
+          DB_USER=postgres
+          DB_PASS=${{ secrets.DB_PASSWORD }}

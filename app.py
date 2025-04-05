@@ -16,22 +16,32 @@ logger.setLevel(logging.DEBUG)
 # Log startup info
 logger.info("Starting application...")
 
+import base64
+import os
+import mimetypes
+import uuid
+import requests
+import json
+import io
+import tempfile
+import subprocess
+import sys
+import time
+import random
+import re
+from pathlib import Path
+from PIL import Image
+from flask import Flask, request, jsonify, send_from_directory, send_file, current_app, g
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
+from flask_migrate import Migrate
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import Unauthorized
+
 try:
-    import base64
-    import os
-    import mimetypes
-    import uuid
-    import requests
-    import json
-    import io
-    import tempfile
-    import subprocess
-    import sys
-    import time
-    import random
-    from pathlib import Path
-    from PIL import Image
-    from flask import Flask, request, jsonify, send_from_directory, send_file, current_app, g
     logger.info("Basic imports successful")
     
     # Log each complex import separately
@@ -585,255 +595,240 @@ try:
     @app.route('/api/claude-suggestions', methods=['POST'])
     @auth_required
     def claude_suggestions():
+        """Get redesign suggestions from Claude"""
         try:
-            print("Received request for Claude suggestions")
-            print(f"USING CLAUDE MODEL: {CLAUDE_MODEL}")
-            
-            # Check if we have two images
+            # Check if required files are in request
             if 'original' not in request.files or 'inspiration' not in request.files:
                 return jsonify({"error": "Both original and inspiration images are required"}), 400
             
+            # Get files
             original_file = request.files['original']
             inspiration_file = request.files['inspiration']
             
-            # Process and save the uploaded images
+            # Validate files
+            for file in [original_file, inspiration_file]:
+                if file.filename == '':
+                    return jsonify({"error": "No file selected"}), 400
+            
+            # Save files to temporary locations
+            original_path = os.path.join('uploads', f"{uuid.uuid4()}.jpg")
+            inspiration_path = os.path.join('uploads', f"{uuid.uuid4()}.jpg")
+            
+            logger.info(f"Saving original image to {original_path}")
+            original_file.save(original_path)
+            
+            logger.info(f"Saving inspiration image to {inspiration_path}")
+            inspiration_file.save(inspiration_path)
+            
+            # Process with Claude
             try:
-                # Save original image with a prefix to identify it later
-                original_temp = process_uploaded_image(original_file, prefix="original_")
-                inspiration_temp = process_uploaded_image(inspiration_file, prefix="inspiration_")
+                logger.info("Calling Claude API with timeout of 60 seconds")
                 
-                print(f"Saved original image to {original_temp}")
-                print(f"Saved inspiration image to {inspiration_temp}")
+                # Get the anthropic client
+                headers = {
+                    "x-api-key": CLAUDE_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+                
+                # Prepare images for Claude
+                logger.info("Preparing images for Claude")
+                original_b64 = encode_image(original_path)
+                inspiration_b64 = encode_image(inspiration_path)
+                
+                # Create the prompt
+                prompt_text = f"""You're the world's greatest interior designer. I'll show you two images:
+1. The first is a room I want to redesign
+2. The second is an inspiration image with a style I like
+
+Please suggest 3 different ways to redesign my room based on the inspiration image.
+For each suggestion, provide:
+- A clear, specific title (10 words or less)
+- A detailed description with color schemes, furniture placement, etc. (250-350 words)
+"""
+                
+                # Prepare the request
+                payload = {
+                    "model": CLAUDE_MODEL,
+                    "max_tokens": 1500,
+                    "temperature": 0.7,
+                    "messages": [
+                        {
+                            "role": "user", 
+                            "content": [
+                                {"type": "text", "text": prompt_text},
+                                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": original_b64}},
+                                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": inspiration_b64}}
+                            ]
+                        }
+                    ]
+                }
+                
+                logger.info("Sending request to Claude API")
+                response = requests.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers,
+                    json=payload,
+                    timeout=60
+                )
+                
+                # Check if response is successful
+                if response.status_code != 200:
+                    logger.error(f"Claude API error: {response.status_code} - {response.text}")
+                    return jsonify({"error": f"Error from Claude API: {response.status_code}"}), 500
+                    
+                result = response.json()
+                logger.info("Received response from Claude")
+                
+                # Extract suggestions from Claude's response
+                suggestions_text = result["content"][0]["text"]
+                
+                # Parse suggestions (titles and descriptions)
+                suggestions = parse_suggestions(suggestions_text)
+                
+                # Track usage
+                if not track_usage(request, original_path, inspiration_path):
+                    logger.error("Failed to track usage")
+                
+                # Return suggestions to client
+                return jsonify({"suggestions": suggestions})
+                
+            except requests.exceptions.Timeout:
+                logger.error("Claude API request timed out")
+                return jsonify({"error": "The Claude API request timed out. Please try again later."}), 504
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Claude API request error: {str(e)}")
+                return jsonify({"error": f"Error connecting to Claude API: {str(e)}"}), 502
             except Exception as e:
-                return jsonify({"error": f"Error processing images: {str(e)}"}), 400
+                logger.error(f"Error processing Claude request: {str(e)}")
+                return jsonify({"error": f"Error processing suggestion request: {str(e)}"}), 500
             
-            # Resize images to ensure they're under 1MB for Claude API
-            def resize_image(image_path):
-                print(f"Original image size: {os.path.getsize(image_path) / (1024 * 1024):.2f} MB")
-                
-                # Open the image
-                img = Image.open(image_path)
-                
-                # Convert to RGB if image has an alpha channel (RGBA)
-                if img.mode in ('RGBA', 'LA'):
-                    print(f"Converting image from {img.mode} to RGB")
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    background.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else img.split()[1])
-                    img = background
-                elif img.mode != 'RGB':
-                    print(f"Converting image from {img.mode} to RGB")
-                    img = img.convert('RGB')
-                
-                # Initialize quality and max_size
-                quality = 90
-                max_size = (1024, 1024)  # Initial max dimensions
-                
-                # Create a BytesIO object to store the compressed image
-                img_byte_arr = io.BytesIO()
-                
-                # Resize and compress until under 1MB
-                while True:
-                    # Resize image, maintaining aspect ratio
-                    img.thumbnail(max_size, Image.Resampling.LANCZOS)
-                    
-                    # Clear the BytesIO object
-                    img_byte_arr.seek(0)
-                    img_byte_arr.truncate(0)
-                    
-                    # Save to BytesIO with compression
-                    img.save(img_byte_arr, format='JPEG', quality=quality)
-                    
-                    # Check size
-                    size_mb = len(img_byte_arr.getvalue()) / (1024 * 1024)
-                    print(f"Resized image size: {size_mb:.2f} MB, Dimensions: {img.size}, Quality: {quality}")
-                    
-                    # If under 1MB, we're done
-                    if size_mb < 0.95:  # Giving a small buffer
-                        break
-                    
-                    # If still too large, reduce quality or size further
-                    if quality > 50:
-                        quality -= 10
-                    else:
-                        # Reduce dimensions
-                        max_size = (int(max_size[0] * 0.9), int(max_size[1] * 0.9))
-                    
-                    # Safety check to prevent infinite loop
-                    if max_size[0] < 300 or quality < 20:
-                        print("Warning: Image quality significantly reduced to meet size requirements")
-                        break
-                
-                # Return the compressed image data
-                img_byte_arr.seek(0)
-                return img_byte_arr.getvalue()
-            
-            # Resize both images
-            print("Resizing original image...")
-            original_data = resize_image(original_temp)
-            print("Resizing inspiration image...")
-            inspiration_data = resize_image(inspiration_temp)
-            
-            # Encode images to base64
-            original_base64 = base64.b64encode(original_data).decode('utf-8')
-            inspiration_base64 = base64.b64encode(inspiration_data).decode('utf-8')
-            
-            # Define our prompt for Claude
-            prompt = """I'm sharing two images: the first is my current room, and the second is an inspiration room design I like. I want you to respond with design suggestions for the current room, inspired by the inspiration image to transform the current room to match the STYLE of the inspiration image, while preserving the FUNCTION and LAYOUT of the current room. Do not change the purpose of any area in the current room - only suggest style updates. I am  going to be giving your suggestions directly to an AI image editing tool to edit the image of the current room. That tool will have access to the current room but NOT the inspirational image. 
-Return ONLY a JSON array with your suggestions, with no additional text before or after. Each suggestion should have a "title" and "description" property. Example format:
- [ { "title": "sample title", 
-"description": "Sample description. The rest of the room should remain unchanged." }, 
-{ "title": "sample title", 
-"description": "Sample description. The rest of the room should remain unchanged." } ] 
-Please format your suggestions in a numbered list (1, 2, 3) where each suggestion is very specific. Each suggestion should be a standalone edit that I can implement one at a time without professional help or major construction. For each suggestion:
-Focus on one simple design element at a time (like bedding, wall decor, small furniture)
-Keep it budget-friendly and easy to execute as a DIY project
-Be specific about what to change and what to add
-End each suggestion with the phrase "The rest of the room should remain unchanged."
-Remember that I want to make these changes sequentially, so organize them in a logical order where each change complements the previous ones. Order suggestions from most structural to most decorative (for example, wall treatments should come before furniture style changes, which should come before accessories). Follow a "big to small" and "background to foreground" approach for the most efficient transformation sequence.
-IMPORTANT: Do not suggest changing the function of any area (e.g., don't turn a TV wall into a bed wall). Keep each area's primary purpose exactly as shown in my current room image, while only updating the style elements to match the aesthetic of the inspiration image.
-Don't suggest changes that would require professional installation or major renovations.
-I'll be using these suggestions with an AI image editing tool, so make them clear, specific, and easy to implement.
-Return ONLY the JSON array with exactly 3 suggestions, with no additional text before or after."""
-            
-            # Prepare the API request to Claude
-            claude_url = "https://api.anthropic.com/v1/messages"
-            headers = {
-                "x-api-key": CLAUDE_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            }
-            
-            print(f"Preparing request with Claude model: {CLAUDE_MODEL}")
-            
-            payload = {
-                "model": CLAUDE_MODEL,
-                "max_tokens": 1000,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt
-                            },
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": original_base64
-                                }
-                            },
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": inspiration_base64
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
-            
-            # Make the request to Claude API with retries
-            print("Sending request to Claude API")
-            claude_response = make_claude_request(claude_url, headers, payload)
-            
-            response_data = claude_response.json()
-            content = response_data.get("content", [])
-            
-            # Extract the text response
-            suggestion_text = ""
-            for item in content:
-                if item.get("type") == "text":
-                    suggestion_text += item.get("text", "")
-            
-            print(f"Claude response: {suggestion_text}")
-            
-            # Parse the JSON response from Claude
+        except Exception as e:
+            logger.exception(f"Error in claude_suggestions: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            # Clean up temporary files
             try:
-                import json
-                suggestions_data = json.loads(suggestion_text)
-                
-                # Validate response format
-                if not isinstance(suggestions_data, list) or len(suggestions_data) != 3:
-                    print("Warning: Claude didn't return properly formatted JSON array with 3 items")
-                    return jsonify({"error": "Invalid response format from Claude"}), 500
-                    
-                # Extract titles and descriptions
-                suggestions = []
-                for item in suggestions_data:
-                    title = item.get("title", "")
-                    description = item.get("description", "")
-                    
-                    if not title or not description:
-                        print("Warning: Missing title or description in Claude response")
-                        continue
-                        
-                    suggestions.append({
-                        "title": title,
-                        "description": description
-                    })
-                
-                # Ensure we have exactly 3 suggestions
-                if len(suggestions) != 3:
-                    print(f"Warning: Expected 3 suggestions, got {len(suggestions)}")
-                    return jsonify({"error": "Couldn't generate 3 valid suggestions"}), 500
-                    
-                print(f"Parsed suggestions: {suggestions}")
-            except json.JSONDecodeError as e:
-                print(f"Error parsing JSON from Claude: {e}")
-                print(f"Raw response: {suggestion_text}")
-                return jsonify({"error": "Failed to parse Claude response as JSON"}), 500
+                if 'original_path' in locals() and os.path.exists(original_path):
+                    os.remove(original_path)
+                if 'inspiration_path' in locals() and os.path.exists(inspiration_path):
+                    os.remove(inspiration_path)
             except Exception as e:
-                print(f"Error processing Claude response: {e}")
-                return jsonify({"error": f"Error processing Claude response: {str(e)}"}), 500
-            
-            # Get user info for tracking
-            # Get user_id from JWT or anonymous_id from cookie
+                logger.error(f"Error cleaning up temporary files: {str(e)}")
+
+    # Helper function to track usage
+    def track_usage(request, original_path, inspiration_path):
+        """Track usage of the redesign service"""
+        try:
+            # Get user info
             user_id = None
             anonymous_id = None
             
-            # Try to get user ID from token
-            try:
-                # Check for JWT Authorization header
-                auth_header = request.headers.get('Authorization')
-                if auth_header and auth_header.startswith('Bearer '):
-                    from flask_jwt_extended import decode_token
+            # Check if user is authenticated
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                try:
+                    # Extract user_id from JWT token
                     token = auth_header.split(' ')[1]
-                    # Extract user ID from token
-                    decoded = decode_token(token)
-                    user_id = decoded.get('sub')
-            except:
-                pass
+                    user_id = get_jwt_identity()
+                except:
+                    logger.error("Failed to extract user_id from token")
             
-            # If no user ID, get anonymous ID from cookie
+            # If not authenticated, use anonymous ID
             if not user_id:
                 anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
             
-            # Track this redesign
-            track_redesign(
+            # Track the redesign
+            success, _ = track_redesign(
                 user_id=user_id,
                 anonymous_id=anonymous_id,
-                original_path=original_temp,
-                inspiration_path=inspiration_temp,
-                suggestions_data=suggestions_data
+                original_path=original_path,
+                inspiration_path=inspiration_path
             )
             
-            # Clean up temp files
-            try:
-                os.remove(original_temp)
-                os.remove(inspiration_temp)
-            except Exception as e:
-                print(f"Error cleaning up temp files: {str(e)}")
+            return success
+        except Exception as e:
+            logger.error(f"Error tracking usage: {str(e)}")
+            return False
+
+    # Helper function to encode images for Claude
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+    # Helper function to parse suggestions from Claude
+    def parse_suggestions(text):
+        suggestions = []
+        current_suggestion = None
+        
+        try:
+            # Split by suggestion numbers
+            parts = re.split(r'\n\s*(?:Suggestion |)\d+[\.:]\s*', text)
             
-            return jsonify({"suggestions": suggestions})
+            # Remove any empty parts and the first part if it's just an intro
+            parts = [p.strip() for p in parts if p.strip()]
+            if len(parts) > 3 and len(parts[0]) < 100:  # The first part is likely an intro
+                parts = parts[1:]
+            
+            # Take up to 3 suggestions
+            parts = parts[:3]
+            
+            for i, part in enumerate(parts):
+                lines = part.split('\n')
+                title = None
+                description = []
+                
+                # First non-empty line is the title
+                for line in lines:
+                    if line.strip() and not title:
+                        title = line.strip()
+                        # Remove any "Title:" prefix
+                        title = re.sub(r'^Title:\s*', '', title)
+                        # Remove any numbering
+                        title = re.sub(r'^\d+[\.\)]\s*', '', title)
+                    elif title:
+                        # Everything after the title is the description
+                        description.append(line)
+                
+                # Join description lines
+                full_description = '\n'.join(description).strip()
+                
+                # Clean up the description
+                full_description = re.sub(r'^Description:\s*', '', full_description)
+                
+                # Add to suggestions if we have both title and description
+                if title and full_description:
+                    suggestions.append({
+                        "title": title,
+                        "description": full_description
+                    })
+            
+            # If we don't have exactly 3 suggestions, create dummy ones
+            while len(suggestions) < 3:
+                suggestions.append({
+                    "title": f"Redesign Option {len(suggestions) + 1}",
+                    "description": "I apologize, but I couldn't generate a detailed suggestion. Please try again or use one of the other redesign options."
+                })
+            
+            return suggestions[:3]  # Ensure we return exactly 3 suggestions
             
         except Exception as e:
-            print(f"Error in claude_suggestions: {str(e)}")
-            return jsonify({"error": str(e)}), 500
+            logger.error(f"Error parsing suggestions: {str(e)}")
+            # Return default suggestions
+            return [
+                {
+                    "title": "Elegant Transformation",
+                    "description": "I apologize, but I couldn't parse the suggestions properly. This is a fallback suggestion. Please try again with your redesign."
+                },
+                {
+                    "title": "Modern Refresh",
+                    "description": "I apologize, but I couldn't parse the suggestions properly. This is a fallback suggestion. Please try again with your redesign."
+                },
+                {
+                    "title": "Cozy Makeover",
+                    "description": "I apologize, but I couldn't parse the suggestions properly. This is a fallback suggestion. Please try again with your redesign."
+                }
+            ]
 
     @app.route('/api/save-results', methods=['POST'])
     def save_results():

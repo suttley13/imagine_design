@@ -14,15 +14,16 @@ import json
 from functools import wraps
 import re
 import uuid
+import logging
 
-from models import db, User, Redesign
+# Create a logger
+logger = logging.getLogger(__name__)
 
 # Create a Blueprint for auth routes
 auth_bp = Blueprint('auth', __name__)
 
-# Constants for anonymous usage
-MAX_ANONYMOUS_USAGE = 3
-ANONYMOUS_COOKIE_NAME = 'redesign_anonymous_id'
+# Constants will be imported from app.py to avoid circular imports
+# Instead of defining here, we'll use them from the flask app config
 
 # Helper function to validate email
 def is_valid_email(email):
@@ -50,6 +51,9 @@ def is_strong_password(password):
 def auth_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        from app import MAX_ANONYMOUS_USAGE, ANONYMOUS_COOKIE_NAME
+        from models import Redesign
+        
         # First, check for JWT token
         try:
             # Check for Authorization header
@@ -57,8 +61,8 @@ def auth_required(f):
             if auth_header and auth_header.startswith('Bearer '):
                 # User has a token, let them proceed
                 return f(*args, **kwargs)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error checking auth header: {str(e)}")
             
         # If no valid token, check for anonymous ID in cookies
         anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
@@ -99,6 +103,8 @@ def auth_required(f):
 @auth_bp.route('/register', methods=['POST'])
 def register():
     """Register a new user"""
+    from models import db, User
+    
     try:
         data = request.get_json()
         
@@ -148,6 +154,7 @@ def register():
         set_refresh_cookies(response, refresh_token)
         
         # If user had anonymous redesigns, associate them with the new account
+        from app import ANONYMOUS_COOKIE_NAME
         anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
         if anonymous_id:
             anonymous_redesigns = Redesign.query.filter_by(anonymous_id=anonymous_id).all()
@@ -159,12 +166,15 @@ def register():
         return response, 201
     
     except Exception as e:
-        current_app.logger.error(f"Error in register: {str(e)}")
+        logger.error(f"Error in register: {str(e)}")
         return jsonify({'error': 'Registration failed', 'details': str(e)}), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Login an existing user"""
+    from models import db, User, Redesign
+    from app import ANONYMOUS_COOKIE_NAME
+    
     try:
         data = request.get_json()
         
@@ -213,7 +223,7 @@ def login():
         return response, 200
     
     except Exception as e:
-        current_app.logger.error(f"Error in login: {str(e)}")
+        logger.error(f"Error in login: {str(e)}")
         return jsonify({'error': 'Login failed', 'details': str(e)}), 500
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -239,6 +249,8 @@ def refresh():
 @jwt_required()
 def get_user():
     """Get the current user's information"""
+    from models import User, Redesign
+    
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
@@ -261,6 +273,9 @@ def get_user():
 @auth_bp.route('/check-anonymous', methods=['GET'])
 def check_anonymous():
     """Check anonymous usage status"""
+    from models import Redesign
+    from app import ANONYMOUS_COOKIE_NAME, MAX_ANONYMOUS_USAGE
+    
     anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
     
     if not anonymous_id:
@@ -288,6 +303,8 @@ def track_redesign(user_id=None, anonymous_id=None, original_path=None, inspirat
     """
     Track a redesign in the database
     """
+    from models import db, Redesign
+    
     try:
         # Create a new redesign record
         redesign = Redesign(
@@ -304,5 +321,5 @@ def track_redesign(user_id=None, anonymous_id=None, original_path=None, inspirat
         
         return True, redesign.id
     except Exception as e:
-        current_app.logger.error(f"Error tracking redesign: {str(e)}")
+        logger.error(f"Error tracking redesign: {str(e)}")
         return False, None 

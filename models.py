@@ -3,7 +3,7 @@ from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Initialize SQLAlchemy with a dummy instance
+# Initialize SQLAlchemy without app
 db = SQLAlchemy()
 
 # User model
@@ -46,14 +46,11 @@ class Redesign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     anonymous_id = db.Column(db.String(36), nullable=True, index=True)
-    original_image_path = db.Column(db.String(255), nullable=False)
-    inspiration_image_path = db.Column(db.String(255), nullable=False)
+    original_image_path = db.Column(db.String(255), nullable=True)
+    inspiration_image_path = db.Column(db.String(255), nullable=True)
     result_image_path = db.Column(db.String(255), nullable=True)
     suggestions = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):
-        if self.user_id:
-            return f'<Redesign {self.id} by User {self.user_id}>'
-        else:
-            return f'<Redesign {self.id} by Anonymous {self.anonymous_id}>' 
+        return f'<Redesign {self.id}>' 

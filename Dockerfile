@@ -27,9 +27,10 @@ RUN mkdir -p uploads generated logs migrations/versions
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV FLASK_CONFIG=cloud_run
+ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8080
 
-# Simplify the startup command to avoid potential errors
+# First check that the service can start, then run migrations, then start Gunicorn
 CMD gunicorn --bind 0.0.0.0:8080 app:app 

@@ -33,6 +33,17 @@
     <div class="container">
         <div class="header">
             <h1 class="logo">REDESIGN<span class="ai">AI</span> PRO</h1>
+            <div class="auth-controls">
+                <span id="usage-info" class="usage-info hidden">Redesigns left: <span id="redesigns-count">3</span></span>
+                <div id="auth-buttons">
+                    <button id="login-button" class="auth-button">Login</button>
+                    <button id="register-button" class="auth-button">Register</button>
+                </div>
+                <div id="user-info" class="hidden">
+                    <span id="user-email"></span>
+                    <button id="logout-button" class="auth-button">Logout</button>
+                </div>
+            </div>
         </div>
 
         <div class="instructions-container">
@@ -186,6 +197,73 @@
             </div>
         </div>
     </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="auth-modal hidden">
+        <div class="auth-modal-content">
+            <span class="auth-close-button">&times;</span>
+            <h2>Login</h2>
+            <div class="auth-form">
+                <div class="auth-input-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" name="email" required>
+                </div>
+                <div class="auth-input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" name="password" required>
+                </div>
+                <div class="auth-error" id="login-error"></div>
+                <button type="button" id="login-submit" class="auth-submit-button">Login</button>
+                <div class="auth-switch">
+                    Don't have an account? <a href="#" id="to-register">Register</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div id="register-modal" class="auth-modal hidden">
+        <div class="auth-modal-content">
+            <span class="auth-close-button">&times;</span>
+            <h2>Create Account</h2>
+            <div class="auth-form">
+                <div class="auth-input-group">
+                    <label for="register-email">Email</label>
+                    <input type="email" id="register-email" name="email" required>
+                </div>
+                <div class="auth-input-group">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" name="password" required>
+                    <div class="password-requirements">
+                        Password must be at least 8 characters with at least one uppercase letter and one number
+                    </div>
+                </div>
+                <div class="auth-input-group">
+                    <label for="register-password-confirm">Confirm Password</label>
+                    <input type="password" id="register-password-confirm" name="password-confirm" required>
+                </div>
+                <div class="auth-error" id="register-error"></div>
+                <button type="button" id="register-submit" class="auth-submit-button">Register</button>
+                <div class="auth-switch">
+                    Already have an account? <a href="#" id="to-login">Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Required Modal -->
+    <div id="auth-required-modal" class="auth-modal hidden">
+        <div class="auth-modal-content">
+            <span class="auth-close-button">&times;</span>
+            <h2>Login Required</h2>
+            <p>You've used all your anonymous redesigns. Please log in or create an account to continue.</p>
+            <div class="auth-required-buttons">
+                <button id="auth-required-login" class="auth-button">Login</button>
+                <button id="auth-required-register" class="auth-button">Register</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="app.js"></script>
 </body>
 </html> 

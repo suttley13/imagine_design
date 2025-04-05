@@ -12,20 +12,49 @@ import time
 import random
 from pathlib import Path
 from PIL import Image
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, current_app, g
+from flask_jwt_extended import JWTManager
+from flask_migrate import Migrate
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import Unauthorized
+
+# Import models and authentication
+from models import db
+from auth import auth_bp, auth_required, track_redesign, ANONYMOUS_COOKIE_NAME, MAX_ANONYMOUS_USAGE
+from config import config
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Create Flask app with explicit static folder configuration
+# Get environment configuration
+config_name = os.environ.get('FLASK_CONFIG') or 'default'
+
+# Create Flask app
 app = Flask(__name__, static_folder='public', static_url_path='')
 
-# Ensure uploads directory exists
+# Apply configuration
+app.config.from_object(config[config_name])
+config[config_name].init_app(app)
+
+# Configure proxy headers for cloud run
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Initialize extensions
+jwt = JWTManager(app)
+db.init_app(app)
+migrate = Migrate(app, db)
+
+# Register blueprints
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+
+# Ensure uploads and generated directories exist
 os.makedirs('uploads', exist_ok=True)
 os.makedirs('generated', exist_ok=True)
+os.makedirs('logs', exist_ok=True)
 
 # Make generated directory accessible to static file server
 app.config['GENERATED_FOLDER'] = os.path.abspath('generated')
@@ -376,6 +405,7 @@ def make_claude_request(url, headers, payload, max_retries=3, initial_delay=1):
     raise Exception(f"Claude API still overloaded after {max_retries} retries")
 
 @app.route('/api/claude-suggestions', methods=['POST'])
+@auth_required
 def claude_suggestions():
     try:
         print("Received request for Claude suggestions")
@@ -583,6 +613,37 @@ Return ONLY the JSON array with exactly 3 suggestions, with no additional text b
             print(f"Error processing Claude response: {e}")
             return jsonify({"error": f"Error processing Claude response: {str(e)}"}), 500
         
+        # Get user info for tracking
+        # Get user_id from JWT or anonymous_id from cookie
+        user_id = None
+        anonymous_id = None
+        
+        # Try to get user ID from token
+        try:
+            # Check for JWT Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                from flask_jwt_extended import decode_token
+                token = auth_header.split(' ')[1]
+                # Extract user ID from token
+                decoded = decode_token(token)
+                user_id = decoded.get('sub')
+        except:
+            pass
+        
+        # If no user ID, get anonymous ID from cookie
+        if not user_id:
+            anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
+        
+        # Track this redesign
+        track_redesign(
+            user_id=user_id,
+            anonymous_id=anonymous_id,
+            original_path=original_temp,
+            inspiration_path=inspiration_temp,
+            suggestions_data=suggestions_data
+        )
+        
         # Clean up temp files
         try:
             os.remove(original_temp)
@@ -635,6 +696,42 @@ def save_results():
         
         # Create download URL
         download_url = f"/api/download/{download_id}"
+        
+        # Get user info for tracking the result
+        user_id = None
+        anonymous_id = None
+        
+        # Try to get user ID from token
+        try:
+            # Check for JWT Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                from flask_jwt_extended import decode_token
+                token = auth_header.split(' ')[1]
+                # Extract user ID from token
+                decoded = decode_token(token)
+                user_id = decoded.get('sub')
+        except:
+            pass
+        
+        # If no user ID, get anonymous ID from cookie
+        if not user_id:
+            anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
+            
+        # Update redesign record with result image
+        if user_id or anonymous_id:
+            from models import Redesign
+            
+            # Find the most recent redesign by this user
+            if user_id:
+                redesign = Redesign.query.filter_by(user_id=user_id).order_by(Redesign.created_at.desc()).first()
+            else:
+                redesign = Redesign.query.filter_by(anonymous_id=anonymous_id).order_by(Redesign.created_at.desc()).first()
+                
+            # If found, update with result image
+            if redesign:
+                redesign.result_image_path = result_file
+                db.session.commit()
         
         # Return success with download URL and clipboard content
         return jsonify({
@@ -721,6 +818,57 @@ def serve_generated_image(filename):
         print(f"Image file does not exist at: {file_path}")
         return "Image not found", 404
 
+@app.route('/api/usage/count', methods=['GET'])
+def get_usage_count():
+    """Get the remaining anonymous usage count"""
+    anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
+    
+    if not anonymous_id:
+        # No anonymous ID yet, so full remaining usage
+        response = jsonify({
+            "usage_count": 0,
+            "remaining": MAX_ANONYMOUS_USAGE,
+            "authenticated": False
+        })
+        
+        # Create a new anonymous ID
+        new_anonymous_id = str(uuid.uuid4())
+        response.set_cookie(ANONYMOUS_COOKIE_NAME, new_anonymous_id, max_age=60*60*24*365, httponly=True, samesite='Strict')
+        return response
+    
+    # Check for JWT Authorization to see if user is logged in
+    is_authenticated = False
+    try:
+        # Check for JWT Authorization header
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            # User has a token, they're authenticated
+            is_authenticated = True
+    except:
+        pass
+    
+    if is_authenticated:
+        # Authenticated users have unlimited usage
+        return jsonify({
+            "usage_count": 0,
+            "remaining": "unlimited",
+            "authenticated": True
+        })
+    
+    # Get usage count for anonymous ID
+    from models import Redesign
+    usage_count = Redesign.query.filter_by(anonymous_id=anonymous_id).count()
+    
+    return jsonify({
+        "usage_count": usage_count,
+        "remaining": max(0, MAX_ANONYMOUS_USAGE - usage_count),
+        "authenticated": False
+    })
+
 if __name__ == "__main__":
+    with app.app_context():
+        # Create database tables
+        db.create_all()
+        
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=True) 

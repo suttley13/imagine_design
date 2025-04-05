@@ -1,4 +1,49 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Auth related elements
+    const loginButton = document.getElementById('login-button');
+    const registerButton = document.getElementById('register-button');
+    const logoutButton = document.getElementById('logout-button');
+    const usageInfo = document.getElementById('usage-info');
+    const redesignsCount = document.getElementById('redesigns-count');
+    const authButtons = document.getElementById('auth-buttons');
+    const userInfo = document.getElementById('user-info');
+    const userEmail = document.getElementById('user-email');
+    
+    // Login modal elements
+    const loginModal = document.getElementById('login-modal');
+    const loginEmailInput = document.getElementById('login-email');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginSubmitButton = document.getElementById('login-submit');
+    const loginError = document.getElementById('login-error');
+    const toRegisterLink = document.getElementById('to-register');
+    
+    // Register modal elements
+    const registerModal = document.getElementById('register-modal');
+    const registerEmailInput = document.getElementById('register-email');
+    const registerPasswordInput = document.getElementById('register-password');
+    const registerPasswordConfirmInput = document.getElementById('register-password-confirm');
+    const registerSubmitButton = document.getElementById('register-submit');
+    const registerError = document.getElementById('register-error');
+    const toLoginLink = document.getElementById('to-login');
+    
+    // Auth required modal elements
+    const authRequiredModal = document.getElementById('auth-required-modal');
+    const authRequiredLoginButton = document.getElementById('auth-required-login');
+    const authRequiredRegisterButton = document.getElementById('auth-required-register');
+    
+    // All modal close buttons
+    const closeButtons = document.querySelectorAll('.auth-close-button');
+    
+    // Authentication state
+    let authState = {
+        isAuthenticated: false,
+        user: null,
+        token: null,
+        anonymousId: null,
+        usageCount: 0,
+        remainingUsage: 3
+    };
+    
     // DOM elements
     const originalImageUpload = document.getElementById('original-image-upload');
     const originalPreviewContainer = document.getElementById('original-preview-container');
@@ -49,6 +94,371 @@ document.addEventListener('DOMContentLoaded', () => {
     let suggestions = [];
     let generatedImagesHistory = []; // Store history of generated images
     let originalImageUrl = null; // Store URL of original image for comparison
+    
+    // Constants
+    const MAX_ANONYMOUS_USAGE = 3;
+    const AUTH_TOKEN_KEY = 'redesign_auth_token';
+    
+    // Auth utility functions
+    function saveAuthToken(token) {
+        localStorage.setItem(AUTH_TOKEN_KEY, token);
+        authState.token = token;
+    }
+    
+    function getAuthToken() {
+        return localStorage.getItem(AUTH_TOKEN_KEY);
+    }
+    
+    function clearAuthToken() {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        authState.token = null;
+    }
+    
+    function updateAuthUI() {
+        if (authState.isAuthenticated) {
+            authButtons.classList.add('hidden');
+            userInfo.classList.remove('hidden');
+            userEmail.textContent = authState.user.email;
+            usageInfo.classList.add('hidden');
+        } else {
+            authButtons.classList.remove('hidden');
+            userInfo.classList.add('hidden');
+            if (authState.remainingUsage !== 'unlimited') {
+                usageInfo.classList.remove('hidden');
+                redesignsCount.textContent = authState.remainingUsage;
+            } else {
+                usageInfo.classList.add('hidden');
+            }
+        }
+    }
+    
+    // Check authentication status on load
+    async function checkAuthStatus() {
+        const token = getAuthToken();
+        
+        if (token) {
+            try {
+                // Verify token with backend
+                const response = await fetch('/api/auth/user', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    authState.isAuthenticated = true;
+                    authState.user = userData.user;
+                    authState.token = token;
+                    authState.remainingUsage = 'unlimited';
+                } else {
+                    // Token invalid or expired
+                    clearAuthToken();
+                }
+            } catch (error) {
+                console.error('Error checking authentication status:', error);
+                clearAuthToken();
+            }
+        }
+        
+        // If not authenticated, check anonymous usage
+        if (!authState.isAuthenticated) {
+            try {
+                const response = await fetch('/api/usage/count');
+                const data = await response.json();
+                
+                authState.anonymousId = data.anonymousId;
+                authState.usageCount = data.usage_count;
+                authState.remainingUsage = data.remaining;
+                
+                if (data.authenticated) {
+                    authState.isAuthenticated = true;
+                    // Need to get user details separately
+                    checkAuthStatus();
+                }
+            } catch (error) {
+                console.error('Error checking usage count:', error);
+            }
+        }
+        
+        // Update UI based on auth state
+        updateAuthUI();
+    }
+    
+    // Initialize auth status
+    checkAuthStatus();
+    
+    // Modal Management
+    function showModal(modal) {
+        // Hide any other open modals
+        document.querySelectorAll('.auth-modal').forEach(m => {
+            m.classList.add('hidden');
+            m.classList.remove('visible');
+        });
+        
+        // Show this modal
+        modal.classList.remove('hidden');
+        // Trigger animation
+        setTimeout(() => {
+            modal.classList.add('visible');
+        }, 10);
+        
+        // Add body class to prevent scrolling
+        document.body.classList.add('modal-open');
+    }
+    
+    function hideModal(modal) {
+        // Hide animation
+        modal.classList.remove('visible');
+        
+        // Actually hide after transition
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            // Remove body class to allow scrolling
+            document.body.classList.remove('modal-open');
+        }, 300);
+    }
+    
+    // Show login modal
+    loginButton.addEventListener('click', () => {
+        showModal(loginModal);
+        loginEmailInput.focus();
+    });
+    
+    // Show register modal
+    registerButton.addEventListener('click', () => {
+        showModal(registerModal);
+        registerEmailInput.focus();
+    });
+    
+    // Switch between login and register
+    toRegisterLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        hideModal(loginModal);
+        setTimeout(() => {
+            showModal(registerModal);
+            registerEmailInput.focus();
+        }, 300);
+    });
+    
+    // Switch between register and login
+    toLoginLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        hideModal(registerModal);
+        setTimeout(() => {
+            showModal(loginModal);
+            loginEmailInput.focus();
+        }, 300);
+    });
+    
+    // Auth required modal buttons
+    authRequiredLoginButton.addEventListener('click', () => {
+        hideModal(authRequiredModal);
+        setTimeout(() => {
+            showModal(loginModal);
+        }, 300);
+    });
+    
+    authRequiredRegisterButton.addEventListener('click', () => {
+        hideModal(authRequiredModal);
+        setTimeout(() => {
+            showModal(registerModal);
+        }, 300);
+    });
+    
+    // Close modals with close button
+    closeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const modal = button.closest('.auth-modal');
+            hideModal(modal);
+        });
+    });
+    
+    // Close modals when clicking outside
+    document.querySelectorAll('.auth-modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideModal(modal);
+            }
+        });
+    });
+    
+    // Login form submission
+    loginSubmitButton.addEventListener('click', async () => {
+        const email = loginEmailInput.value.trim();
+        const password = loginPasswordInput.value.trim();
+        
+        // Reset error
+        loginError.textContent = '';
+        
+        // Basic validation
+        if (!email || !password) {
+            loginError.textContent = 'Please enter both email and password';
+            return;
+        }
+        
+        try {
+            // Disable button and show loading
+            loginSubmitButton.disabled = true;
+            loginSubmitButton.textContent = 'Logging in...';
+            
+            // Send login request
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Save token and update auth state
+                saveAuthToken(data.access_token);
+                authState.isAuthenticated = true;
+                authState.user = data.user;
+                
+                // Update UI
+                updateAuthUI();
+                
+                // Close modal
+                hideModal(loginModal);
+                
+                // Clear form
+                loginEmailInput.value = '';
+                loginPasswordInput.value = '';
+                
+                // Show success message
+                showAlert('Logged in successfully', false);
+            } else {
+                // Show error
+                loginError.textContent = data.error || 'Login failed';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            loginError.textContent = 'An error occurred. Please try again.';
+        } finally {
+            // Re-enable button
+            loginSubmitButton.disabled = false;
+            loginSubmitButton.textContent = 'Login';
+        }
+    });
+    
+    // Register form submission
+    registerSubmitButton.addEventListener('click', async () => {
+        const email = registerEmailInput.value.trim();
+        const password = registerPasswordInput.value.trim();
+        const passwordConfirm = registerPasswordConfirmInput.value.trim();
+        
+        // Reset error
+        registerError.textContent = '';
+        
+        // Basic validation
+        if (!email || !password || !passwordConfirm) {
+            registerError.textContent = 'Please fill out all fields';
+            return;
+        }
+        
+        // Password match validation
+        if (password !== passwordConfirm) {
+            registerError.textContent = 'Passwords do not match';
+            return;
+        }
+        
+        // Password strength validation
+        const hasUppercase = /[A-Z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const isLongEnough = password.length >= 8;
+        
+        if (!hasUppercase || !hasNumber || !isLongEnough) {
+            registerError.textContent = 'Password must be at least 8 characters with one uppercase letter and one number';
+            return;
+        }
+        
+        try {
+            // Disable button and show loading
+            registerSubmitButton.disabled = true;
+            registerSubmitButton.textContent = 'Creating account...';
+            
+            // Send register request
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Save token and update auth state
+                saveAuthToken(data.access_token);
+                authState.isAuthenticated = true;
+                authState.user = data.user;
+                
+                // Update UI
+                updateAuthUI();
+                
+                // Close modal
+                hideModal(registerModal);
+                
+                // Clear form
+                registerEmailInput.value = '';
+                registerPasswordInput.value = '';
+                registerPasswordConfirmInput.value = '';
+                
+                // Show success message
+                showAlert('Account created successfully', false);
+            } else {
+                // Show error
+                registerError.textContent = data.error || 'Registration failed';
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            registerError.textContent = 'An error occurred. Please try again.';
+        } finally {
+            // Re-enable button
+            registerSubmitButton.disabled = false;
+            registerSubmitButton.textContent = 'Register';
+        }
+    });
+    
+    // Logout handler
+    logoutButton.addEventListener('click', async () => {
+        try {
+            // Call logout endpoint
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authState.token}`
+                }
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+        
+        // Clear local auth state regardless of API response
+        clearAuthToken();
+        authState.isAuthenticated = false;
+        authState.user = null;
+        
+        // Check anonymous usage again
+        checkAuthStatus();
+        
+        // Show success message
+        showAlert('Logged out successfully', false);
+    });
+    
+    // Handle authentication error responses
+    function handleAuthError(error) {
+        if (error && error.code === 'AUTH_REQUIRED') {
+            showModal(authRequiredModal);
+            return true;
+        }
+        return false;
+    }
     
     // Loading message cycling
     let loadingTextInterval;
@@ -546,14 +956,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('Invalid image source: ' + (typeof sourceImage));
             }
             
-            // Send to server
-            console.log('Sending request to Gemini API');
-            const response = await fetch('/api/chat-with-image', {
+            // Prepare request with authentication if available
+            const requestOptions = {
                 method: 'POST',
                 body: formData
-            });
+            };
+            
+            // Add auth header if logged in
+            if (authState.token) {
+                requestOptions.headers = {
+                    'Authorization': `Bearer ${authState.token}`
+                };
+            }
+            
+            // Send to server
+            console.log('Sending request to Gemini API');
+            const response = await fetch('/api/chat-with-image', requestOptions);
             
             if (!response.ok) {
+                // Check if authentication error
+                const errorData = await response.json();
+                if (handleAuthError(errorData.error)) {
+                    isProcessing = false;
+                    return { success: false, error: 'Authentication required' };
+                }
                 throw new Error('Network response was not ok');
             }
             
@@ -596,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     suggestionStatuses[suggestionIndex + 1].classList.add('loading');
                     
                     // If it's not the last image, wait a bit before moving to the next step
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 
                 // Add click event listener to the suggestion status
@@ -662,11 +1088,20 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('original', originalSelectedImage);
             formData.append('inspiration', inspirationSelectedImage);
             
-            // Get suggestions from Claude
-            const claudeResponse = await fetch('/api/claude-suggestions', {
+            // Add auth headers if logged in
+            const requestOptions = {
                 method: 'POST',
                 body: formData
-            });
+            };
+            
+            if (authState.token) {
+                requestOptions.headers = {
+                    'Authorization': `Bearer ${authState.token}`
+                };
+            }
+            
+            // Get suggestions from Claude
+            const claudeResponse = await fetch('/api/claude-suggestions', requestOptions);
             
             // Check if we have an error response
             if (!claudeResponse.ok) {
@@ -676,6 +1111,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Stop loading messages cycle
                 stopLoadingTextCycle();
+                
+                // Check if authentication error
+                if (handleAuthError(errorData)) {
+                    // Auth error handled, reset processing state
+                    isProcessing = false;
+                    resetProcessing();
+                    return;
+                }
                 
                 // Show a more user-friendly message for known errors
                 if (errorMessage.includes('HEIC') || errorMessage.includes('heic')) {
@@ -748,69 +1191,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 status.classList.remove('loading');
             });
             
-            // Show spinner on the first suggestion
+            // Process the first suggestion immediately
             suggestionStatuses[0].classList.add('loading');
+            const result1 = await processSuggestion(originalSelectedImage, suggestions[0].description, 0);
             
-            // Now process each suggestion with Gemini
-            console.log('Starting to process suggestions with Gemini');
-            resultPlaceholder.classList.add('hidden');
-            resultLoadingSpinner.classList.remove('hidden');
+            if (!result1.success) {
+                throw new Error(`Failed to process first suggestion: ${result1.error}`);
+            }
             
-            // Start with the original image
-            let currentSourceImage = originalSelectedImage;
+            // Enable hints after first suggestion
+            suggestionsClickHint.classList.remove('hidden');
             
-            // Process each suggestion in sequence
-            for (let i = 0; i < suggestions.length; i++) {
-                console.log(`Processing suggestion ${i + 1}`);
+            // Process the second suggestion
+            const result2 = await processSuggestion(result1.resultImageUrl, suggestions[1].description, 1);
+            
+            if (!result2.success) {
+                // If second suggestion fails but first succeeded, we can still show the first result
+                console.error('Second suggestion failed, but continuing with available results');
+            } else {
+                // Process the third suggestion
+                const result3 = await processSuggestion(result2.resultImageUrl, suggestions[2].description, 2);
                 
-                // Process this suggestion - send description only, not title
-                const result = await processSuggestion(
-                    currentSourceImage, 
-                    suggestions[i].description, // Use only the description for Gemini
-                    i
-                );
-                
-                if (result.success) {
-                    console.log(`Suggestion ${i + 1} completed successfully`);
-                    // Use the result image as the source for the next step
-                    currentSourceImage = result.resultImageUrl;
-                } else {
-                    // If there's an error, stop the process
-                    console.error(`Error on suggestion ${i + 1}:`, result.error);
-                    alert(`Error on suggestion ${i + 1}: ${result.error}`);
-                    resetProcessing();
-                    return;
+                if (!result3.success) {
+                    console.error('Third suggestion failed, but continuing with available results');
                 }
             }
             
-            // All done
-            console.log('Redesign process completed successfully');
-            resultLoadingSpinner.classList.add('hidden');
-            redesignButton.classList.remove('hidden');
-            redesignLoading.classList.add('hidden');
-            redesignButton.disabled = false;
-            isProcessing = false;
-            
-            // Show the suggestions click hint now that all images are processed
-            suggestionsClickHint.classList.remove('hidden');
+            // Update anonymous usage count
+            if (!authState.isAuthenticated) {
+                checkAuthStatus();
+            }
             
         } catch (error) {
             console.error('Error in redesign process:', error);
-            
-            // Stop loading messages cycle
-            stopLoadingTextCycle();
-            
-            // Check for specific error types
-            if (error.message.includes('HEIC') || error.message.includes('heic')) {
-                showAlert('We attempted to convert your HEIC image but encountered an issue. Please convert it to JPEG format using Photos app or similar before uploading.', true);
-            } else {
-                showAlert(`Error: ${error.message}`);
-            }
-            
-            // Hide loading container on error
+            showAlert(`Error: ${error.message}`, true);
+            // Reset processing state
+            resetProcessing();
+        } finally {
+            // Ensure the loading container is hidden
             if (loadingContainer) loadingContainer.style.display = 'none';
             
-            resetProcessing();
+            // Re-enable the button after processing
+            if (document.body.contains(redesignButton)) {
+                redesignButton.disabled = false;
+            }
+            isProcessing = false;
         }
     }
     
@@ -970,13 +1395,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to save results
     function saveResults() {
-        if (resultImage.src) {
-            const link = document.createElement('a');
-            link.download = 'redesignai_result.jpg';
-            link.href = resultImage.src;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        if (!generatedImagesHistory || generatedImagesHistory.length === 0) {
+            console.error('No results to save');
+            return;
         }
+        
+        // Find the currently selected suggestion
+        let selectedIndex = 0;
+        suggestionStatuses.forEach((status, index) => {
+            if (status.classList.contains('selected')) {
+                selectedIndex = index;
+            }
+        });
+        
+        // Get the selected image URL
+        const selectedImage = generatedImagesHistory[selectedIndex];
+        if (!selectedImage || !selectedImage.imageUrl) {
+            console.error('No image URL found for the selected suggestion');
+            return;
+        }
+        
+        // Disable download button during processing
+        downloadBtn.disabled = true;
+        
+        // Request headers with auth
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        // Add auth token if available
+        if (authState.token) {
+            headers['Authorization'] = `Bearer ${authState.token}`;
+        }
+        
+        // Send the save request to the server
+        fetch('/api/save-results', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                result_image: selectedImage.imageUrl,
+                suggestions: suggestions
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Create a link to download the file
+                const link = document.createElement('a');
+                link.href = data.download_url;
+                link.download = 'redesign_result.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Copy text to clipboard if supported
+                if (data.clipboard_content && navigator.clipboard) {
+                    navigator.clipboard.writeText(data.clipboard_content)
+                        .then(() => {
+                            console.log('Suggestions copied to clipboard');
+                        })
+                        .catch(err => {
+                            console.error('Could not copy text: ', err);
+                        });
+                }
+                
+                showAlert('Image saved successfully', false);
+            } else {
+                showAlert('Error: ' + (data.error || 'Could not save the image'), true);
+            }
+        })
+        .catch(error => {
+            console.error('Error saving results:', error);
+            showAlert('Error: Could not save the image', true);
+        })
+        .finally(() => {
+            // Re-enable download button
+            downloadBtn.disabled = false;
+        });
     }
 }); 

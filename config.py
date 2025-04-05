@@ -1,5 +1,9 @@
 import os
 from datetime import timedelta
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # Base configuration for all environments
 class Config:
@@ -30,57 +34,39 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or \
-        'sqlite:///test.db'
-    WTF_CSRF_ENABLED = False
+        'sqlite:///:memory:'
 
 
 # Production configuration
 class ProductionConfig(Config):
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///prod.db'
-    JWT_COOKIE_SECURE = True  # Only send cookies over HTTPS
+    DEBUG = False
     
-    @classmethod
-    def init_app(cls, app):
-        Config.init_app(app)
-        
-        # Configure production-specific logging
-        import logging
-        from logging.handlers import RotatingFileHandler
-        
-        file_handler = RotatingFileHandler('logs/redesign_ai.log', maxBytes=10485760, backupCount=10)
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s '
-            '[in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        app.logger.setLevel(logging.INFO)
-        app.logger.info('RedesignAI startup')
+    # For production, prefer PostgreSQL
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    
+    # If DATABASE_URL isn't set, fall back to SQLite (not ideal for production)
+    if not SQLALCHEMY_DATABASE_URI:
+        logger.warning('DATABASE_URL not set, using SQLite (not recommended for production)')
+        SQLALCHEMY_DATABASE_URI = 'sqlite:///prod.db'
+    
+    # In production, use secure cookies
+    JWT_COOKIE_SECURE = True
 
 
 # Cloud Run configuration
 class CloudRunConfig(ProductionConfig):
-    @classmethod
-    def init_app(cls, app):
+    @staticmethod
+    def init_app(app):
         ProductionConfig.init_app(app)
         
-        # Log to stdout/stderr for Cloud Run
-        import logging
-        from logging import StreamHandler
+        # Log cloud run specific settings
+        logger.info("Initializing Cloud Run configuration")
         
-        file_handler = StreamHandler()
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s '
-            '[in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        app.logger.setLevel(logging.INFO)
+        # Cloud Run specific configurations
+        app.config['PREFERRED_URL_SCHEME'] = 'https'
         
-        # Handle proxy server headers
-        from werkzeug.middleware.proxy_fix import ProxyFix
-        app.wsgi_app = ProxyFix(app.wsgi_app)
+        # Additional Cloud Run specific settings could go here
+        logger.info("Cloud Run configuration complete")
 
 
 # Configuration dictionary

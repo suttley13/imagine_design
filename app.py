@@ -48,8 +48,19 @@ jwt = JWTManager(app)
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# Verify database connection on startup
+with app.app_context():
+    try:
+        # Try to connect to the database
+        db.engine.connect()
+        print("Database connection successful")
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        # Don't crash, let the migration tool handle this
+        pass
+
 # Register blueprints
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(auth_bp, url_prefix='/auth')
 
 # Ensure uploads and generated directories exist
 os.makedirs('uploads', exist_ok=True)
@@ -865,10 +876,7 @@ def get_usage_count():
         "authenticated": False
     })
 
-if __name__ == "__main__":
-    with app.app_context():
-        # Create database tables
-        db.create_all()
-        
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=True) 
+# Ensure the application listens on the port provided by Cloud Run
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port) 

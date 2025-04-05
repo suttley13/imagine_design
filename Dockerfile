@@ -32,4 +32,7 @@ ENV FLASK_CONFIG=cloud_run
 EXPOSE 8080
 
 # Run database migrations and then start the application with Gunicorn
-CMD flask db upgrade && gunicorn --bind 0.0.0.0:8080 app:app 
+CMD echo "Starting app. Attempting database migration..." && \
+    python -c "from app import app; from models import db; import time; print('Waiting for database...'); time.sleep(5); print('Testing connection...'); with app.app_context(): db.engine.connect(); print('DB Connection successful')" && \
+    flask db upgrade && \
+    gunicorn --bind 0.0.0.0:8080 app:app 

@@ -460,6 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
             status.classList.remove('completed');
             status.classList.remove('active');
             status.classList.remove('selected');
+            status.classList.remove('loading');
         });
         
         // Clear image history
@@ -503,11 +504,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Mark all previous steps as completed
             for (let i = 0; i < suggestionIndex; i++) {
                 suggestionStatuses[i].classList.remove('active');
+                suggestionStatuses[i].classList.remove('loading');
                 suggestionStatuses[i].classList.add('completed');
             }
             
-            // Show this step as active
-            suggestionStatuses[suggestionIndex].classList.add('active');
+            // Show this step as loading - replaces active with loading
+            suggestionStatuses[suggestionIndex].classList.remove('active');
+            suggestionStatuses[suggestionIndex].classList.add('loading');
             
             // Create FormData for image upload
             const formData = new FormData();
@@ -573,7 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultPlaceholder.classList.add('hidden');
                 resultContainer.classList.remove('hidden');
                 resultLoadingSpinner.classList.add('hidden');
-                cornerLoadingSpinner.classList.add('hidden');
                 
                 // Show this image to the user
                 // Add a visual indicator for the current step
@@ -585,15 +587,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 
                 // Mark this suggestion as completed
-                suggestionStatuses[suggestionIndex].classList.remove('active');
+                suggestionStatuses[suggestionIndex].classList.remove('loading');
                 suggestionStatuses[suggestionIndex].classList.add('completed');
                 
-                // Wait a moment for the user to see this generation if it's not the last one
+                // Immediately show spinner on the next suggestion if not the last one
                 if (suggestionIndex < 2) {
+                    // Immediately show the spinner on the next suggestion
+                    suggestionStatuses[suggestionIndex + 1].classList.add('loading');
+                    
                     // If it's not the last image, wait a bit before moving to the next step
                     await new Promise(resolve => setTimeout(resolve, 2000));
-                    // Show the corner loading spinner instead of the full-screen one
-                    cornerLoadingSpinner.classList.remove('hidden');
                 }
                 
                 // Add click event listener to the suggestion status
@@ -608,7 +611,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     resultImage.src = imageUrl;
                     resultContainer.classList.remove('hidden');
                     resultLoadingSpinner.classList.add('hidden');
-                    cornerLoadingSpinner.classList.add('hidden');
                     
                     // Setup before/after comparison for this result
                     setupBeforeAfterComparison();
@@ -743,7 +745,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 status.classList.remove('completed');
                 status.classList.remove('active');
                 status.classList.remove('selected');
+                status.classList.remove('loading');
             });
+            
+            // Show spinner on the first suggestion
+            suggestionStatuses[0].classList.add('loading');
             
             // Now process each suggestion with Gemini
             console.log('Starting to process suggestions with Gemini');

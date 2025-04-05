@@ -430,6 +430,7 @@ textarea {
 }
 
 .suggestion-status {
+    position: relative;  /* Ensure position relative for absolute positioning */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -459,7 +460,8 @@ textarea {
 }
 
 .suggestion-status.selected {
-    border: 2px solid #007bff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-1px);
 }
 
 .suggestion-text {
@@ -472,7 +474,7 @@ textarea {
 .image-box {
     background-color: white;
     padding: 15px;
-    border-radius: 8px;
+    border-radius: 8px 8px 24px 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
@@ -1203,8 +1205,8 @@ textarea {
 
 .download-button {
     position: absolute;
-    right: 15px;
-    bottom: -5px;
+    right: -8px;
+    bottom: -8px;
     background-color: white;
     border: none;
     border-radius: 50%;
@@ -1214,9 +1216,17 @@ textarea {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    transition: box-shadow 0.2s ease; /* Only transition shadow */
     z-index: 10;
+    opacity: 1;
+}
+
+.download-button svg {
+    width: 36px;  /* Increased size */
+    height: 36px; /* Increased size */
+    color: var(--light-blue);
+    opacity: 1;
 }
 
 #result-container:hover .download-button {
@@ -1224,14 +1234,12 @@ textarea {
 }
 
 .download-button:hover {
-    background-color: #fff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    background-color: white; /* Explicitly set background */
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); /* Larger, darker shadow on hover */
 }
 
 .download-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); /* Return to original shadow when clicked */
 }
 
 .preview-container {
@@ -1248,4 +1256,34 @@ textarea {
     height: 100%;
     object-fit: cover;
     display: block;
+}
+
+/* Suggestion status spinner */
+.suggestion-status-spinner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+    border: 2px solid #f3f3f3;
+    border-radius: 50%;
+    border-top: 2px solid var(--light-blue);
+    width: 18px;
+    height: 18px;
+    animation: spin 1s linear infinite;
+    display: none; /* Hidden by default */
+}
+
+.suggestion-status.loading {
+    background-color: #f8f9fa;
+    color: transparent;
+}
+
+.suggestion-status.loading .status-number {
+    opacity: 0;
+}
+
+.suggestion-status.loading .suggestion-status-spinner {
+    display: block; /* Show when loading */
 } 

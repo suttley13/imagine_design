@@ -48,16 +48,14 @@ jwt = JWTManager(app)
 db.init_app(app)
 migrate = Migrate(app, db)
 
-# Verify database connection on startup
+# Simplify database connection handling
 with app.app_context():
     try:
-        # Try to connect to the database
-        db.engine.connect()
-        print("Database connection successful")
+        db.create_all()
+        print("Database tables created successfully")
     except Exception as e:
-        print(f"Database connection failed: {e}")
-        # Don't crash, let the migration tool handle this
-        pass
+        print(f"Database initialization error: {e}")
+        # Continue anyway - tables might already exist
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/auth')

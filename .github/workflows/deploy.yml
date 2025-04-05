@@ -90,7 +90,7 @@ jobs:
         flags: --allow-unauthenticated --add-cloudsql-instances=${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DATABASE_INSTANCE }}
         env_vars: >-
           FLASK_CONFIG=cloud_run
-          DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@/${{ env.DATABASE_NAME }}?host=/cloudsql/${{ env.CONNECTION_NAME }}
+          DATABASE_URL=postgresql://postgres:${{ secrets.DB_PASSWORD }}@localhost/${{ env.DATABASE_NAME }}?host=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DATABASE_INSTANCE }}
           SECRET_KEY=${{ secrets.SECRET_KEY }}
           JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}

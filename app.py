@@ -503,6 +503,9 @@ def make_claude_request(url, headers, payload, max_retries=3, initial_delay=1):
 @auth_required
 def claude_suggestions():
     """Get redesign suggestions from Claude"""
+    original_path = None
+    inspiration_path = None
+    
     try:
         # Check if required files are in request
         if 'original' not in request.files or 'inspiration' not in request.files:
@@ -529,7 +532,7 @@ def claude_suggestions():
         
         # Process with Claude
         try:
-            logger.info("Calling Claude API with timeout of 60 seconds")
+            logger.info("Setting up Claude API request")
             
             # Get the anthropic client
             headers = {
@@ -538,10 +541,25 @@ def claude_suggestions():
                 "content-type": "application/json"
             }
             
-            # Prepare images for Claude
-            logger.info("Preparing images for Claude")
-            original_b64 = encode_image(original_path)
-            inspiration_b64 = encode_image(inspiration_path)
+            # Log the API key length (without revealing the key)
+            if CLAUDE_API_KEY:
+                logger.info(f"Claude API key present (length: {len(CLAUDE_API_KEY)})")
+            else:
+                logger.error("Claude API key is empty or not set")
+                return jsonify({"error": "API configuration error"}), 500
+                
+            # Log the model being used
+            logger.info(f"Using Claude model: {CLAUDE_MODEL}")
+            
+            # Prepare images for Claude with compression if needed
+            logger.info("Encoding images for Claude API")
+            try:
+                original_b64 = encode_image(original_path)
+                inspiration_b64 = encode_image(inspiration_path)
+                logger.info("Images encoded successfully")
+            except Exception as e:
+                logger.error(f"Error encoding images: {str(e)}")
+                return jsonify({"error": f"Error processing images: {str(e)}"}), 500
             
             # Create the prompt
             prompt_text = f"""You're the world's greatest interior designer. I'll show you two images:
@@ -551,13 +569,13 @@ def claude_suggestions():
 Please suggest 3 different ways to redesign my room based on the inspiration image.
 For each suggestion, provide:
 - A clear, specific title (10 words or less)
-- A detailed description with color schemes, furniture placement, etc. (250-350 words)
+- A detailed description with color schemes, furniture placement, etc. (150-250 words)
 """
             
             # Prepare the request
             payload = {
                 "model": CLAUDE_MODEL,
-                "max_tokens": 1500,
+                "max_tokens": 1000,
                 "temperature": 0.7,
                 "messages": [
                     {
@@ -571,43 +589,74 @@ For each suggestion, provide:
                 ]
             }
             
-            logger.info("Sending request to Claude API")
-            response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-                timeout=60
-            )
-            
-            # Check if response is successful
-            if response.status_code != 200:
-                logger.error(f"Claude API error: {response.status_code} - {response.text}")
-                return jsonify({"error": f"Error from Claude API: {response.status_code}"}), 500
+            logger.info("Sending request to Claude API with 90 second timeout")
+            try:
+                response = requests.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers,
+                    json=payload,
+                    timeout=90  # Increase timeout to 90 seconds
+                )
                 
-            result = response.json()
-            logger.info("Received response from Claude")
-            
-            # Extract suggestions from Claude's response
-            suggestions_text = result["content"][0]["text"]
-            
-            # Parse suggestions (titles and descriptions)
-            suggestions = parse_suggestions(suggestions_text)
-            
-            # Track usage
-            if not track_usage(request, original_path, inspiration_path):
-                logger.error("Failed to track usage")
-            
-            # Return suggestions to client
-            return jsonify({"suggestions": suggestions})
-            
-        except requests.exceptions.Timeout:
-            logger.error("Claude API request timed out")
-            return jsonify({"error": "The Claude API request timed out. Please try again later."}), 504
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Claude API request error: {str(e)}")
-            return jsonify({"error": f"Error connecting to Claude API: {str(e)}"}), 502
+                # Log response status and headers
+                logger.info(f"Claude API response status: {response.status_code}")
+                logger.info(f"Claude API response headers: {response.headers}")
+                
+                # Check for common error status codes
+                if response.status_code == 429:
+                    logger.error("Claude API rate limit exceeded")
+                    return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+                elif response.status_code == 401:
+                    logger.error("Claude API authentication failed")
+                    return jsonify({"error": "API authentication failed."}), 500
+                elif response.status_code != 200:
+                    # Log the error response text
+                    error_text = response.text
+                    logger.error(f"Claude API error: {response.status_code} - {error_text[:200]}")
+                    return jsonify({"error": f"Error from Claude API: {response.status_code}"}), 500
+                
+                # Try to parse the JSON response
+                try:
+                    result = response.json()
+                    logger.info("Successfully parsed Claude API response")
+                except Exception as e:
+                    logger.error(f"Error parsing Claude API response: {str(e)}")
+                    logger.error(f"Response text: {response.text[:200]}")
+                    return jsonify({"error": "Invalid response from Claude API"}), 500
+                
+                # Extract suggestions from Claude's response
+                if "content" not in result or len(result["content"]) == 0:
+                    logger.error("Claude API response missing content field")
+                    logger.error(f"Response: {str(result)[:200]}")
+                    return jsonify({"error": "Invalid response format from Claude API"}), 500
+                
+                suggestions_text = result["content"][0]["text"]
+                logger.info(f"Received text response of length: {len(suggestions_text)}")
+                
+                # Parse suggestions (titles and descriptions)
+                suggestions = parse_suggestions(suggestions_text)
+                logger.info(f"Parsed {len(suggestions)} suggestions")
+                
+                # Track usage
+                if not track_usage(request, original_path, inspiration_path):
+                    logger.error("Failed to track usage")
+                
+                # Return suggestions to client
+                return jsonify({"suggestions": suggestions})
+                
+            except requests.exceptions.Timeout:
+                logger.error("Claude API request timed out after 90 seconds")
+                return jsonify({"error": "The Claude API request timed out. Please try again later."}), 504
+            except requests.exceptions.ConnectionError:
+                logger.error("Connection error when calling Claude API")
+                return jsonify({"error": "Network connection error. Please check your internet connection."}), 502
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Claude API request error: {str(e)}")
+                return jsonify({"error": f"Error connecting to Claude API: {str(e)}"}), 502
+                
         except Exception as e:
             logger.error(f"Error processing Claude request: {str(e)}")
+            logger.error(traceback.format_exc())
             return jsonify({"error": f"Error processing suggestion request: {str(e)}"}), 500
         
     except Exception as e:
@@ -616,10 +665,12 @@ For each suggestion, provide:
     finally:
         # Clean up temporary files
         try:
-            if 'original_path' in locals() and os.path.exists(original_path):
+            if original_path and os.path.exists(original_path):
                 os.remove(original_path)
-            if 'inspiration_path' in locals() and os.path.exists(inspiration_path):
+                logger.info(f"Removed temporary file: {original_path}")
+            if inspiration_path and os.path.exists(inspiration_path):
                 os.remove(inspiration_path)
+                logger.info(f"Removed temporary file: {inspiration_path}")
         except Exception as e:
             logger.error(f"Error cleaning up temporary files: {str(e)}")
 
@@ -638,30 +689,105 @@ def track_usage(request, original_path, inspiration_path):
                 # Extract user_id from JWT token
                 token = auth_header.split(' ')[1]
                 user_id = get_jwt_identity()
-            except:
-                logger.error("Failed to extract user_id from token")
+                logger.info(f"Identified authenticated user ID: {user_id}")
+            except Exception as e:
+                logger.error(f"Failed to extract user_id from token: {str(e)}")
         
         # If not authenticated, use anonymous ID
         if not user_id:
             anonymous_id = request.cookies.get(ANONYMOUS_COOKIE_NAME)
+            if anonymous_id:
+                logger.info(f"Using anonymous ID: {anonymous_id[:8]}...")
+            else:
+                logger.warning("No anonymous ID found in cookies")
         
         # Track the redesign
-        success, _ = track_redesign(
+        success, redesign_id = track_redesign(
             user_id=user_id,
             anonymous_id=anonymous_id,
             original_path=original_path,
             inspiration_path=inspiration_path
         )
         
+        if success:
+            logger.info(f"Successfully tracked redesign with ID: {redesign_id}")
+        else:
+            logger.error("Failed to create redesign record")
+            
         return success
     except Exception as e:
         logger.error(f"Error tracking usage: {str(e)}")
+        logger.error(traceback.format_exc())
         return False
 
-# Helper function to encode images for Claude
+# Helper function to encode images for Claude with size check and compression
 def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+    """Encode an image to base64, with optional resizing to meet Claude's limits"""
+    try:
+        # Check file size
+        file_size = os.path.getsize(image_path) / (1024 * 1024)  # Size in MB
+        logger.info(f"Original image size: {file_size:.2f} MB")
+        
+        if file_size > 4.5:  # Claude has a 5MB limit, using 4.5 to be safe
+            logger.info("Image too large, compressing...")
+            try:
+                # Open and compress the image
+                img = Image.open(image_path)
+                
+                # Convert to RGB if needed
+                if img.mode in ('RGBA', 'LA'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else img.split()[1])
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Start with decent quality
+                quality = 85
+                max_size = (1600, 1600)  # Reasonable max dimensions
+                
+                # Resize the image if it's too large
+                if img.width > max_size[0] or img.height > max_size[1]:
+                    img.thumbnail(max_size, Image.LANCZOS)
+                    logger.info(f"Resized image to {img.width}x{img.height}")
+                
+                # Create a BytesIO object to check the compressed size
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='JPEG', quality=quality)
+                compressed_size = len(img_byte_arr.getvalue()) / (1024 * 1024)
+                
+                # If still too large, reduce quality iteratively
+                while compressed_size > 4.5 and quality > 30:
+                    quality -= 10
+                    img_byte_arr = io.BytesIO()
+                    img.save(img_byte_arr, format='JPEG', quality=quality)
+                    compressed_size = len(img_byte_arr.getvalue()) / (1024 * 1024)
+                    logger.info(f"Reduced quality to {quality}, new size: {compressed_size:.2f} MB")
+                
+                # If still too large, reduce dimensions
+                while compressed_size > 4.5 and max_size[0] > 800:
+                    max_size = (int(max_size[0] * 0.8), int(max_size[1] * 0.8))
+                    img.thumbnail(max_size, Image.LANCZOS)
+                    img_byte_arr = io.BytesIO()
+                    img.save(img_byte_arr, format='JPEG', quality=quality)
+                    compressed_size = len(img_byte_arr.getvalue()) / (1024 * 1024)
+                    logger.info(f"Resized to {img.width}x{img.height}, new size: {compressed_size:.2f} MB")
+                
+                # Get the base64 encoded string from the compressed image
+                img_byte_arr.seek(0)
+                return base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                
+            except Exception as e:
+                logger.error(f"Error compressing image: {str(e)}")
+                # Fall back to original file if compression fails
+        
+        # If file size is acceptable or compression failed, use the original file
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+            
+    except Exception as e:
+        logger.error(f"Error encoding image: {str(e)}")
+        raise
 
 # Helper function to parse suggestions from Claude
 def parse_suggestions(text):
@@ -944,6 +1070,101 @@ def get_usage_count():
         "remaining": max(0, MAX_ANONYMOUS_USAGE - usage_count),
         "authenticated": False
     })
+
+# Add a test endpoint for Claude API
+@app.route('/api/test-claude', methods=['GET'])
+def test_claude():
+    """Test the Claude API connection with a simple prompt"""
+    try:
+        # Check if the API key is set
+        if not CLAUDE_API_KEY:
+            logger.error("Claude API key is not set")
+            return jsonify({"status": "error", "message": "API key not configured"}), 500
+            
+        # Log the API key length (without revealing the key)
+        logger.info(f"Using Claude API key (length: {len(CLAUDE_API_KEY)})")
+        logger.info(f"Using Claude model: {CLAUDE_MODEL}")
+        
+        # Prepare a simple request
+        headers = {
+            "x-api-key": CLAUDE_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        
+        payload = {
+            "model": CLAUDE_MODEL,
+            "max_tokens": 100,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Hello, can you confirm this is working? Just say 'Claude API is working!' and nothing else."}
+                    ]
+                }
+            ]
+        }
+        
+        logger.info("Sending test request to Claude API")
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        # Log response details
+        logger.info(f"Claude API response status: {response.status_code}")
+        
+        if response.status_code != 200:
+            error_message = response.text
+            logger.error(f"Claude API error: {response.status_code} - {error_message[:200]}")
+            return jsonify({
+                "status": "error", 
+                "message": f"API Error: {response.status_code}",
+                "details": error_message[:200]
+            }), 500
+            
+        # Parse the response
+        try:
+            result = response.json()
+            logger.info("Successfully parsed Claude API response")
+            
+            # Extract text from response
+            if "content" in result and len(result["content"]) > 0 and "text" in result["content"][0]:
+                response_text = result["content"][0]["text"]
+                logger.info(f"Claude API response text: {response_text}")
+                return jsonify({
+                    "status": "success",
+                    "message": "Claude API is working",
+                    "response": response_text
+                })
+            else:
+                logger.error("Unexpected response format")
+                return jsonify({
+                    "status": "error",
+                    "message": "Unexpected response format",
+                    "raw_response": result
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"Error parsing Claude API response: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": f"Error parsing response: {str(e)}",
+                "raw_response": response.text[:500]
+            }), 500
+            
+    except requests.exceptions.Timeout:
+        logger.error("Claude API request timed out")
+        return jsonify({"status": "error", "message": "API request timed out"}), 504
+    except requests.exceptions.ConnectionError:
+        logger.error("Connection error when calling Claude API")
+        return jsonify({"status": "error", "message": "Network connection error"}), 502
+    except Exception as e:
+        logger.error(f"Error testing Claude API: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Ensure the application listens on the port provided by Cloud Run
 if __name__ == '__main__':

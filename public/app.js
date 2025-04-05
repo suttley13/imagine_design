@@ -855,52 +855,20 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Reset processing state
     function resetProcessing() {
-        isProcessing = false;
-        redesignButton.disabled = false;
-        redesignButton.classList.remove('hidden');
+        // Stop loading animations
+        stopLoadingTextCycle();
+        
+        // Hide loading elements
         redesignLoading.classList.add('hidden');
+        loadingContainer.classList.add('hidden');
         
-        // Hide loading states
-        suggestionsLoading.classList.add('hidden');
-        resultLoadingSpinner.classList.add('hidden');
-        cornerLoadingSpinner.classList.add('hidden');
-        
-        // Reset suggestion statuses
-        suggestionStatuses.forEach(status => {
-            status.classList.remove('completed');
-            status.classList.remove('active');
-            status.classList.remove('selected');
-            status.classList.remove('loading');
-        });
-        
-        // Clear image history
-        generatedImagesHistory = [];
-        
-        // Hide click hint
-        clickHint.classList.add('hidden');
-        suggestionsClickHint.classList.add('hidden');
-        
-        // Reset current suggestion index
-        currentSuggestionIndex = 0;
-        
-        // Update UI
-        resultLoadingSpinner.classList.add('hidden');
-        resultContainer.classList.add('hidden');
-        resultPlaceholder.classList.remove('hidden');
-        
-        suggestionsLoading.classList.add('hidden');
-        suggestionsList.classList.add('hidden');
-        suggestionsPlaceholder.classList.remove('hidden');
-        
-        redesignButton.disabled = false;
-        
-        // Show upload sections and hide results
+        // Show upload elements
         uploadSectionContainer.classList.remove('hidden');
         redesignButtonContainer.classList.remove('hidden');
-        resultsContainer.classList.add('hidden');
+        instructionsContainer.classList.remove('hidden');
         
-        // Enable download button if we have results
-        updateDownloadButtonState();
+        // Reset processing state
+        isProcessing = false;
     }
     
     // Process a single suggestion with Gemini
@@ -1096,11 +1064,20 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Get suggestions from the server
             console.log('Fetching redesign suggestions');
-            const response = await fetch('/api/claude-suggestions', {
+            
+            // Use a timeout promise to handle long requests
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timed out after 120 seconds')), 120000);
+            });
+            
+            const fetchPromise = fetch('/api/claude-suggestions', {
                 method: 'POST',
                 headers: headers,
                 body: formData
             });
+            
+            // Race the fetch against the timeout
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
             
             // Handle possible 401 unauthorized
             if (response.status === 401) {
@@ -1127,12 +1104,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Parse JSON response
-            const data = await response.json();
-            
-            // Check for error
+            // Handle server errors
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to get redesign suggestions');
+                let errorMessage = 'Server error occurred';
+                
+                try {
+                    // Try to get the error message from the response
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || `Server error: ${response.status}`;
+                    console.error('API error:', errorData);
+                } catch (e) {
+                    // If cannot parse JSON, use status text
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                    console.error('API error:', response.status, response.statusText);
+                }
+                
+                // Show error alert and reset UI
+                showAlert(`Error: ${errorMessage}`, true);
+                resetProcessing();
+                return;
+            }
+            
+            // Parse JSON response
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                console.error('Error parsing response:', e);
+                showAlert('Error: Unable to parse server response. Please try again.', true);
+                resetProcessing();
+                return;
             }
             
             // Use the suggestions
@@ -1162,13 +1163,24 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (error) {
             console.error('Error in redesign process:', error);
-            showAlert('Error getting redesign suggestions: ' + error.message);
             
-            // Reset UI
-            resetProcessing();
-        } finally {
-            // Hide loading, show content
+            // Hide loading indicators
             redesignLoading.classList.add('hidden');
+            loadingContainer.classList.add('hidden');
+            stopLoadingTextCycle();
+            
+            // Show upload sections again
+            uploadSectionContainer.classList.remove('hidden');
+            redesignButtonContainer.classList.remove('hidden');
+            instructionsContainer.classList.remove('hidden');
+            
+            // Show error message
+            let errorMessage = error.message || 'An unexpected error occurred';
+            if (errorMessage.includes('timed out')) {
+                errorMessage = 'The server took too long to respond. Please try again later.';
+            }
+            
+            showAlert(`Error: ${errorMessage}`, true);
             
             isProcessing = false;
         }

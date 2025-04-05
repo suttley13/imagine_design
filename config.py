@@ -93,7 +93,12 @@ class CloudRunConfig(ProductionConfig):
         db_user = os.environ.get('DB_USER', 'postgres')
         db_pass = os.environ.get('DB_PASS', '')
         
-        SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_pass}@/{db_name}?host=/cloudsql/{instance}"
+        # Handle empty password case - PostgreSQL treats empty string as no password
+        db_pass_segment = f":{db_pass}" if db_pass else ""
+        
+        # Build connection string with conditional password segment
+        SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}{db_pass_segment}@/{db_name}?host=/cloudsql/{instance}"
+        logger.info(f"Using connection string: postgresql://{db_user}:*****@/{db_name}?host=/cloudsql/{instance}")
     
     @staticmethod
     def init_app(app):

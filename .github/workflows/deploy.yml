@@ -99,4 +99,3 @@ jobs:
           INSTANCE_CONNECTION_NAME=${{ env.PROJECT_ID }}:${{ env.REGION }}:${{ env.DATABASE_INSTANCE }}
           DB_NAME=${{ env.DATABASE_NAME }}
           DB_USER=postgres
-          DB_PASS=${{ secrets.DB_PASSWORD }}

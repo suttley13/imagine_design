@@ -75,14 +75,22 @@ except Exception as e:
     app.config.from_object(config['default'])
     config['default'].init_app(app)
 
-# Initialize database before importing models
-from flask_sqlalchemy import SQLAlchemy
-db = SQLAlchemy(app)
+# Import db and models
+from models import db, User, Redesign
+logger.info("Models imported")
+
+# Initialize database with app
+db.init_app(app)
 logger.info("SQLAlchemy initialized")
 
-# Import models after db init
-from models import User, Redesign
-logger.info("Models imported")
+# Create database tables within app context if needed
+with app.app_context():
+    try:
+        db.create_all()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {str(e)}")
+        logger.error(traceback.format_exc())
 
 # Initialize other extensions
 from flask_migrate import Migrate

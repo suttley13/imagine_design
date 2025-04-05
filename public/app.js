@@ -382,6 +382,19 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add comparing class to show we're in comparison mode
             resultImage.classList.add('comparing');
             beforeElements.container.classList.add('comparing');
+            
+            // Force the border radius on the original image
+            beforeElements.image.style.borderRadius = '8px';
+            
+            // Show the comparison indicator
+            if (comparisonIndicator) {
+                comparisonIndicator.classList.remove('hidden');
+                
+                // Set a timeout to fade it out
+                setTimeout(() => {
+                    comparisonIndicator.classList.add('fade-out');
+                }, 1500);
+            }
         };
         
         // Show result image on mouse up or touch end

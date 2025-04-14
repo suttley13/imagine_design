@@ -1,5 +1,5 @@
-# Use Python 3.11 slim image
-FROM python:3.11-slim
+# Use Python 3.10 slim image
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
@@ -32,5 +32,5 @@ ENV PYTHONUNBUFFERED=1
 # Expose port
 EXPOSE 8080
 
-# First check that the service can start, then run migrations, then start Gunicorn
-CMD gunicorn --bind 0.0.0.0:8080 app:app 
+# Use a simple command to start the application
+CMD python -m gunicorn --workers=2 --bind 0.0.0.0:8080 app:app 

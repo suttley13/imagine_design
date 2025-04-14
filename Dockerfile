@@ -32,5 +32,5 @@ ENV PYTHONUNBUFFERED=1
 # Expose port
 EXPOSE 8080
 
-# Use a simple command to start the application
-CMD python -m gunicorn --workers=2 --bind 0.0.0.0:8080 app:app 
+# Use a more reliable command to start the application
+CMD gunicorn --bind=0.0.0.0:8080 --timeout=120 --workers=1 app:app 
